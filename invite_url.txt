@@ -1,0 +1,1 @@
+http://localhost:5173/employee/accept-invite?token=8f08636b918e816fed4819232f5c8b3dfa106fec4ae5e0c84f514d9e8f35e28e

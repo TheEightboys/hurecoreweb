@@ -1,0 +1,646 @@
+import React, { useEffect, useMemo, useState } from "react";
+
+/**
+ * HURE Core — Employee/Staff Dashboard (Microsaas) — Single-file React Preview
+ * Tailwind-ready UI (works in Canvas Preview). No external deps.
+ *
+ * Mirrors Employer/Owner features from recent build:
+ * - License fields (type, number, expiry) with "expiring soon" (≤30 days) logic
+ * - Onboarding status (auto-computed) & Staff verification status badges
+ * - Employment status
+ * - My Schedule (only assigned shifts) with Confirm / Decline + reason
+ * - My Attendance (Clock In / Clock Out demo + CSV export)
+ * - My Leave (request + status)
+ * - Docs & Policies (read-only list + per-staff acknowledgement)
+ * - Profile & KYC-style panel (edit contact; manage license fields; demo uploads)
+ * - LocalStorage persistence for all sections
+ */
+
+export default function HureEmployeePortal(){
+  // --- LocalStorage keys ---
+  const LS = {
+    me: 'hure_emp_me',
+    schedule: 'hure_emp_schedule',
+    punches: 'hure_emp_punches',
+    leaves: 'hure_emp_leaves',
+    docs: 'hure_emp_docs',
+    notices: 'hure_emp_notices'
+  };
+
+  // --- Demo defaults ---
+  const defaultMe = {
+    id: 1001,
+    firstName: 'S.',
+    lastName: 'Achieng',
+    jobRole: 'Nurse',
+    accountRole: 'Employee',
+    phone: '+254700555666',
+    email: 's.achieng@example.com',
+    clinic: { name: 'Demo Clinic', town: 'Nairobi', location: 'Main Branch' },
+    // Credentialing & verification
+    licenseType: 'Nursing Council',
+    licenseNumber: 'RC-12345',
+    licenseExpiry: '2026-03-15',
+    staffKycStatus: 'pending_review', // not_started | pending_review | verified | rejected | expired
+    employmentStatus: 'active', // active | inactive | suspended
+    practiceCountry: 'KE',
+    staffCategory: 'Clinician' // Clinician | Admin
+  };
+
+  // Only their shifts
+  const defaultSchedule = [
+    { id: 1, date: '2025-12-02', start: '08:00', end: '14:00', role: 'Nurse', status: 'Confirmed' },
+    { id: 2, date: '2025-12-05', start: '12:00', end: '18:00', role: 'Nurse', status: 'Open' },
+    { id: 3, date: '2025-12-10', start: '08:00', end: '16:00', role: 'Nurse', status: 'Confirmed' }
+  ];
+
+  const defaultPunches = [
+    { id: 1, date: '2025-11-09', in: '08:02', out: '14:05' }
+  ];
+
+  const defaultLeaves = [
+    { id: 1, type: 'Sick', from: '2025-12-10', to: '2025-12-12', status: 'Pending', notes: 'Fever' }
+  ];
+
+  const defaultDocs = [
+    { id: 1, title: 'Employee Handbook', type: 'Policy', uploaded: '2025-07-01', url: null, acknowledged: false, acknowledgedAt: null },
+    { id: 2, title: 'Code of Conduct', type: 'Policy', uploaded: '2025-08-12', url: null, acknowledged: false, acknowledgedAt: null }
+  ];
+
+  // Simple seeded notifications so the tab is not empty
+  const defaultNotices = [
+    {
+      id: 1,
+      title: 'Welcome to HURE Core',
+      when: '2025-11-30',
+      body: 'This is your staff portal. You can view shifts, clock in/out, request leave and acknowledge policies here.'
+    },
+    {
+      id: 2,
+      title: 'Update your license',
+      when: '2025-12-01',
+      body: 'Please make sure your professional license details and expiry date are up to date in your profile.'
+    }
+  ];
+
+  const LICENSE_OPTIONS = {
+    KE: [
+      'Kenya Medical Practitioners and Dentists Council (KMPDC)',
+      'Nursing Council of Kenya (NCK)',
+      'Clinical Officers Council',
+      'Pharmacy and Poisons Board (PPB)',
+      'Laboratory Board',
+      'Radiography / Imaging Board',
+      'Other'
+    ],
+    UG: ['Other'],
+    TZ: ['Other']
+  };
+
+  // --- State ---
+  const [view, setView] = useState('dashboard');
+  const [me, setMe] = useState(()=>{ try{ return JSON.parse(localStorage.getItem(LS.me)) || defaultMe }catch(e){ return defaultMe } });
+  const [schedule, setSchedule] = useState(()=>{ try{ return JSON.parse(localStorage.getItem(LS.schedule)) || defaultSchedule }catch(e){ return defaultSchedule } });
+  const [punches, setPunches] = useState(()=>{ try{ return JSON.parse(localStorage.getItem(LS.punches)) || defaultPunches }catch(e){ return defaultPunches } });
+  const [leaves, setLeaves] = useState(()=>{ try{ return JSON.parse(localStorage.getItem(LS.leaves)) || defaultLeaves }catch(e){ return defaultLeaves } });
+  const [docs, setDocs] = useState(()=>{ try{ return JSON.parse(localStorage.getItem(LS.docs)) || defaultDocs }catch(e){ return defaultDocs } });
+  const [notices, setNotices] = useState(()=>{ try{ return JSON.parse(localStorage.getItem(LS.notices)) || defaultNotices }catch(e){ return defaultNotices } });
+
+  useEffect(()=> localStorage.setItem(LS.me, JSON.stringify(me)), [me]);
+  useEffect(()=> localStorage.setItem(LS.schedule, JSON.stringify(schedule)), [schedule]);
+  useEffect(()=> localStorage.setItem(LS.punches, JSON.stringify(punches)), [punches]);
+  useEffect(()=> localStorage.setItem(LS.leaves, JSON.stringify(leaves)), [leaves]);
+  useEffect(()=> localStorage.setItem(LS.docs, JSON.stringify(docs)), [docs]);
+  useEffect(()=> localStorage.setItem(LS.notices, JSON.stringify(notices)), [notices]);
+
+  const fullName = (u)=> `${u.firstName} ${u.lastName}`;
+
+  // --- Helpers ---
+  const humanize = (s) => String(s ?? '').replace(/_/g, ' ');
+
+  const todayISO = new Date().toISOString().slice(0,10);
+  const nextShift = useMemo(()=> schedule
+    .filter(s=> s.date >= todayISO)
+    .sort((a,b)=> a.date.localeCompare(b.date))[0] || null, [schedule, todayISO]);
+  const todayShift = useMemo(()=> schedule.find(s=> s.date === todayISO) || null, [schedule, todayISO]);
+
+  function daysUntil(dateStr){
+    if(!dateStr) return null;
+    const oneDay = 24*60*60*1000;
+    const d = new Date(dateStr + 'T00:00:00');
+    const now = new Date();
+    return Math.round((d.getTime() - new Date(now.toDateString()).getTime()) / oneDay);
+  }
+
+  const licenseDays = daysUntil(me.licenseExpiry);
+  const licenseExpiringSoon = licenseDays !== null && licenseDays <= 30 && licenseDays >= 0;
+  const licenseExpired = licenseDays !== null && licenseDays < 0;
+
+  function computeOnboardingStatus(){
+    const contactOk = !!(me.phone && me.email);
+    const licenseRequired = me.staffCategory !== 'Admin';
+    const hasLicenseFields = !!(me.licenseType && me.licenseNumber && me.licenseExpiry);
+    const licenseOk = !licenseRequired || (hasLicenseFields && !licenseExpired);
+
+    if(!contactOk) return 'incomplete';
+    if(licenseRequired && !hasLicenseFields) return 'incomplete';
+    if(licenseRequired && licenseExpired) return 'blocked_expired_license';
+    if(me.staffKycStatus === 'verified') return 'ready';
+    if(me.staffKycStatus === 'rejected') return 'blocked_kyc_rejected';
+    if(me.staffKycStatus === 'expired') return 'blocked_kyc_expired';
+    return 'pending_kyc';
+  }
+  const onboardingStatus = computeOnboardingStatus();
+
+  const needsReminder = licenseExpired || licenseExpiringSoon || me.staffKycStatus !== 'verified';
+  const reminderText = (()=>{
+    const parts = [];
+    if(licenseExpired) parts.push('License expired');
+    else if(licenseExpiringSoon) parts.push(`License expiring in ${licenseDays} days`);
+    if(me.staffKycStatus !== 'verified') parts.push(`Verification status: ${humanize(me.staffKycStatus)}`);
+    return parts.join(' · ');
+  })();
+
+  // --- Clock In/Out (demo only; no real geofencing) ---
+  const [activePunch, setActivePunch] = useState(null); // {id, date, in}
+  function clockIn(){
+    if(activePunch) return alert('You are already clocked in.');
+    const now = new Date();
+    const date = now.toISOString().slice(0,10);
+    const time = now.toTimeString().slice(0,5);
+    const id = punches.length ? Math.max(...punches.map(p=>p.id))+1 : 1;
+    const punch = { id, date, in: time };
+    setPunches(prev=> [...prev, { ...punch }] );
+    setActivePunch(punch);
+  }
+  function clockOut(){
+    if(!activePunch) return alert('You are not clocked in.');
+    const now = new Date();
+    const time = now.toTimeString().slice(0,5);
+    setPunches(prev=> prev.map(p=> p.id===activePunch.id ? { ...p, out: time } : p));
+    setActivePunch(null);
+  }
+
+  // --- Leave ---
+  const [showLeaveModal, setShowLeaveModal] = useState(false);
+  const [newLeave, setNewLeave] = useState({ type: 'Sick', from: todayISO, to: todayISO, notes: '' });
+  function submitLeave(){
+    if(!newLeave.from || !newLeave.to) return alert('Select from/to dates.');
+    const id = leaves.length ? Math.max(...leaves.map(l=>l.id))+1 : 1;
+    setLeaves(prev=> [{ id, ...newLeave, status: 'Pending' }, ...prev]);
+    setShowLeaveModal(false);
+  }
+
+  // --- CSV export for attendance ---
+  function toCSV(rows, headers){
+    const lines = [ headers.join(',') ];
+    rows.forEach(r => lines.push(headers.map(h => '"' + String(r[h] ?? '') + '"').join(',')));
+    return lines.join('\n');
+  }
+  function download(filename, content){ const blob = new Blob([content], { type: 'text/csv' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = filename; a.click(); URL.revokeObjectURL(url); }
+  function exportAttendance(){ const headers = ['date','in','out']; const csv = toCSV(punches, headers); download('my_attendance.csv', csv); }
+
+  // --- Lightweight runtime tests for toCSV ---
+  useEffect(()=>{
+    const csv = toCSV([
+      {date:'2025-01-01',in:'08:00',out:'16:00'},
+      {date:'2025-01-02',in:'09:00',out:'17:00'}
+    ], ['date','in','out']);
+    console.assert(csv.includes('\n'), 'CSV should contain newline characters');
+    console.assert(csv.split('\n').length === 3, 'CSV should have header + 2 rows');
+  },[]);
+
+  // --- Demo file uploads for KYC (DataURL only) ---
+  const [kycFiles, setKycFiles] = useState({ idCard:null, license:null });
+  function onKycFile(kind, file){
+    const reader = new FileReader();
+    reader.onload = ()=> setKycFiles(prev=> ({ ...prev, [kind]: reader.result }));
+    reader.readAsDataURL(file);
+  }
+
+  // --- Shift confirm / decline ---
+  function confirmShift(id){
+    setSchedule(prev => prev.map(s => s.id === id ? { ...s, status: 'Confirmed', declineReason: undefined } : s));
+  }
+  function declineShift(id){
+    const reason = window.prompt('Reason for declining (optional)') || '';
+    setSchedule(prev => prev.map(s => s.id === id ? { ...s, status: 'Declined', declineReason: reason } : s));
+  }
+
+  // --- Policy acknowledgement ---
+  function acknowledgeDoc(id){
+    const now = new Date().toISOString();
+    setDocs(prev => prev.map(d => d.id === id ? { ...d, acknowledged: true, acknowledgedAt: now } : d));
+  }
+
+  // --- Simple title helper ---
+  const viewTitle = (()=>{
+    switch(view){
+      case 'schedule': return 'My Schedule';
+      case 'attendance': return 'My Attendance';
+      case 'leave': return 'My Leave';
+      case 'docs': return 'Docs & Policies';
+      case 'profile': return 'My Profile';
+      case 'notices': return 'Notifications';
+      default: return `Hi, ${fullName(me)}`;
+    }
+  })();
+
+  // --- UI ---
+  return (
+    <div className="min-h-screen bg-gray-50 text-gray-800">
+      <div className="flex">
+        <aside className="w-72 bg-white border-r border-gray-200 min-h-screen sticky top-0 flex flex-col">
+          <div className="p-4 border-b">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-semibold">HC</div>
+              <div>
+                <div className="text-sm font-semibold">HURE Core</div>
+                <div className="text-xs text-gray-500">Employee / Staff</div>
+              </div>
+            </div>
+          </div>
+
+          <nav className="p-4 space-y-1 text-sm flex-1">
+            <div className="text-xs text-gray-400 uppercase mb-2">Menu</div>
+            <button onClick={()=>setView('dashboard')} className={`block w-full text-left px-3 py-2 rounded-md ${view==='dashboard' ? 'bg-blue-50 text-blue-700' : 'hover:bg-gray-100'}`}>My Dashboard</button>
+            <button onClick={()=>setView('schedule')} className={`block w-full text-left px-3 py-2 rounded-md ${view==='schedule' ? 'bg-blue-50 text-blue-700' : 'hover:bg-gray-100'}`}>My Schedule</button>
+            <button onClick={()=>setView('attendance')} className={`block w-full text-left px-3 py-2 rounded-md ${view==='attendance' ? 'bg-blue-50 text-blue-700' : 'hover:bg-gray-100'}`}>My Attendance</button>
+            <button onClick={()=>setView('leave')} className={`block w-full text-left px-3 py-2 rounded-md ${view==='leave' ? 'bg-blue-50 text-blue-700' : 'hover:bg-gray-100'}`}>My Leave</button>
+            <button onClick={()=>setView('docs')} className={`block w-full text-left px-3 py-2 rounded-md ${view==='docs' ? 'bg-blue-50 text-blue-700' : 'hover:bg-gray-100'}`}>Docs & Policies</button>
+            <button onClick={()=>setView('profile')} className={`block w-full text-left px-3 py-2 rounded-md ${view==='profile' ? 'bg-blue-50 text-blue-700' : 'hover:bg-gray-100'}`}>Profile</button>
+            <button onClick={()=>setView('notices')} className={`block w-full text-left px-3 py-2 rounded-md ${view==='notices' ? 'bg-blue-50 text-blue-700' : 'hover:bg-gray-100'}`}>Notifications</button>
+          </nav>
+
+          <div className="p-4 text-xs text-gray-400">Need help? Contact admin.</div>
+        </aside>
+
+        <main className="flex-1 p-8">
+          <header className="flex items-center justify-between mb-6">
+            <div>
+              <h1 className="text-2xl font-semibold">{viewTitle}</h1>
+              <p className="text-sm text-gray-500 mt-1">{me.clinic.name} · {me.clinic.town}</p>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="text-right">
+                <div className="text-sm font-medium">{me.jobRole}</div>
+                <div className="text-xs text-gray-500">{me.accountRole}</div>
+              </div>
+              <div className="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center">{me.firstName?.[0] || 'U'}</div>
+            </div>
+          </header>
+
+          {view==='dashboard' && (
+            <div>
+              {needsReminder && (
+                <div className="mb-4 p-3 rounded-md bg-amber-50 border border-amber-200 text-sm text-amber-900 flex items-center justify-between">
+                  <div>
+                    <div className="font-medium">Action needed</div>
+                    <div className="text-xs">{reminderText}</div>
+                  </div>
+                  <button onClick={()=>setView('profile')} className="px-3 py-1 rounded-md bg-amber-600 text-white text-xs">Update now</button>
+                </div>
+              )}
+
+              <section className="grid grid-cols-4 gap-4 mb-6">
+                <div className="bg-white p-4 rounded-lg shadow-sm border">
+                  <div className="text-xs text-gray-400">Onboarding</div>
+                  <div className="mt-2 text-sm font-medium capitalize">{humanize(onboardingStatus) || '—'}</div>
+                </div>
+                <div className="bg-white p-4 rounded-lg shadow-sm border">
+                  <div className="text-xs text-gray-400">Verification status</div>
+                  <div className="mt-2 text-sm font-medium capitalize">{humanize(me.staffKycStatus) || '—'}</div>
+                </div>
+                <div className="bg-white p-4 rounded-lg shadow-sm border">
+                  <div className="text-xs text-gray-400">Employment</div>
+                  <div className="mt-2 text-sm font-medium capitalize">{humanize(me.employmentStatus) || '—'}</div>
+                </div>
+                <div className="bg-white p-4 rounded-lg shadow-sm border">
+                  <div className="text-xs text-gray-400">License</div>
+                  <div className="mt-2 text-sm">{me.licenseType || '—'} · {me.licenseNumber || '—'}</div>
+                  <div className={`text-xs mt-1 ${licenseExpired? 'text-red-600' : licenseExpiringSoon? 'text-amber-600' : 'text-gray-500'}`}>
+                    {'Expiry: '}{me.licenseExpiry || '—'}{licenseExpired ? ' (expired)' : licenseExpiringSoon ? ` (${licenseDays} days left)` : ''}
+                  </div>
+                </div>
+              </section>
+
+              <div className="grid grid-cols-3 gap-6">
+                <div className="col-span-2 bg-white p-4 rounded-lg shadow-sm border">
+                  <div className="flex items-center justify-between mb-3">
+                    <h2 className="text-lg font-semibold">Upcoming shifts</h2>
+                    {nextShift && (
+                      <div className="text-xs text-gray-500">Next: {nextShift.date} {nextShift.start}–{nextShift.end}</div>
+                    )}
+                  </div>
+                  <div className="space-y-3">
+                    {schedule.filter(s=> s.date >= todayISO).map(s => (
+                      <div key={s.id} className="flex items-center justify-between p-3 rounded-md bg-gray-50 border">
+                        <div>
+                          <div className="text-sm font-medium">{s.date} · {s.start}–{s.end} · {s.role}</div>
+                          <div className="text-xs text-gray-500">{s.status}</div>
+                          {s.declineReason && <div className="text-xs text-red-500">Declined: {s.declineReason}</div>}
+                        </div>
+                        <div className="flex gap-2">
+                          {s.status !== 'Confirmed' && (
+                            <>
+                              <button onClick={()=>confirmShift(s.id)} className="text-xs border rounded px-2 py-1">Confirm</button>
+                              <button onClick={()=>declineShift(s.id)} className="text-xs border rounded px-2 py-1 text-red-600">Decline</button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="bg-white p-4 rounded-lg shadow-sm border">
+                  <h3 className="text-lg font-semibold mb-3">Quick actions</h3>
+                  <div className="space-y-2">
+                    <button
+                      onClick={activePunch ? clockOut : clockIn}
+                      className="w-full px-3 py-2 rounded-md bg-green-600 text-white text-sm">
+                      {activePunch ? 'Clock Out' : 'Clock In'}
+                    </button>
+                    <div className="text-xs text-gray-500">
+                      {activePunch
+                        ? `Clocked in today at ${activePunch.in}`
+                        : todayShift
+                        ? `You are scheduled today: ${todayShift.start}–${todayShift.end}`
+                        : 'No active clock-in.'}
+                    </div>
+                    <button onClick={()=>setView('attendance')} className="w-full px-3 py-2 rounded-md bg-white border text-sm">View My Attendance</button>
+                    <button onClick={()=>setView('leave')} className="w-full px-3 py-2 rounded-md bg-white border text-sm">Request Leave</button>
+                    <button onClick={()=>setView('profile')} className="w-full px-3 py-2 rounded-md bg-white border text-sm">Update Profile</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {view==='schedule' && (
+            <div className="bg-white p-4 rounded-lg shadow-sm border">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-lg font-semibold">My Schedule</h2>
+                <div className="text-sm text-gray-500">Read-only (assigned by admin)</div>
+              </div>
+              <div className="space-y-3">
+                {schedule.map(s => (
+                  <div key={s.id} className="flex items-center justify-between p-3 rounded-md bg-gray-50 border">
+                    <div>
+                      <div className="text-sm font-medium">{s.date} · {s.start}–{s.end} · {s.role}</div>
+                      <div className="text-xs text-gray-500">{s.status}</div>
+                      {s.declineReason && <div className="text-xs text-red-500">Declined: {s.declineReason}</div>}
+                    </div>
+                    <div className="flex gap-2">
+                      {s.status !== 'Confirmed' && (
+                        <>
+                          <button onClick={()=>confirmShift(s.id)} className="text-xs border rounded px-2 py-1">Confirm</button>
+                          <button onClick={()=>declineShift(s.id)} className="text-xs border rounded px-2 py-1 text-red-600">Decline</button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {view==='attendance' && (
+            <div className="bg-white p-4 rounded-lg shadow-sm border max-w-2xl">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-lg font-semibold">My Attendance</h2>
+                <button onClick={exportAttendance} className="px-3 py-2 rounded-md bg-white border text-sm">Export CSV</button>
+              </div>
+              <table className="w-full text-sm">
+                <thead><tr className="text-left text-xs text-gray-500 border-b"><th className="py-2">Date</th><th className="py-2">In</th><th className="py-2">Out</th></tr></thead>
+                <tbody>
+                  {punches.slice().reverse().map(p => (
+                    <tr key={p.id} className="border-b"><td className="py-2">{p.date}</td><td className="py-2">{p.in||'—'}</td><td className="py-2">{p.out||'—'}</td></tr>
+                  ))}
+                </tbody>
+              </table>
+              <div className="text-xs text-gray-500 mt-2">
+                Demo: In production, clock-in/out can be restricted by clinic location (WiFi, QR code, or admin PIN) instead of exact street address.
+              </div>
+            </div>
+          )}
+
+          {view==='leave' && (
+            <div className="bg-white p-4 rounded-lg shadow-sm border max-w-2xl">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-lg font-semibold">My Leave</h2>
+                <button onClick={()=>setShowLeaveModal(true)} className="px-3 py-2 rounded-md bg-blue-600 text-white text-sm">Request Leave</button>
+              </div>
+              <div className="space-y-3">
+                {leaves.map(l => (
+                  <div key={l.id} className="p-3 rounded-md bg-gray-50 border flex items-start justify-between">
+                    <div>
+                      <div className="text-sm font-medium">{l.type}</div>
+                      <div className="text-xs text-gray-500">{l.from} to {l.to}</div>
+                      {l.notes && <div className="text-xs mt-1">{l.notes}</div>}
+                    </div>
+                    <div className="text-sm">{l.status}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {view==='docs' && (
+            <div className="bg-white p-4 rounded-lg shadow-sm border max-w-3xl">
+              <h2 className="text-lg font-semibold mb-3">Docs & Policies</h2>
+              <ul className="space-y-2">
+                {docs.map(d => (
+                  <li key={d.id} className="p-2 border rounded flex items-center justify-between">
+                    <div>
+                      <div className="font-medium">{d.title}</div>
+                      <div className="text-xs text-gray-500">{d.type} · {d.uploaded}</div>
+                      {d.acknowledged && d.acknowledgedAt && (
+                        <div className="text-xs text-green-700">Acknowledged on {d.acknowledgedAt.slice(0,10)}</div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 text-sm">
+                      <span className="text-gray-500 cursor-pointer">Download</span>
+                      {!d.acknowledged && (
+                        <button
+                          onClick={()=>acknowledgeDoc(d.id)}
+                          className="px-2 py-1 border rounded text-xs">
+                          Acknowledge
+                        </button>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+              <div className="text-xs text-gray-500 mt-2">Demo: Acknowledgements sync to Owner/Admin dashboards in the real app.</div>
+            </div>
+          )}
+
+          {view==='profile' && (
+            <div className="bg-white p-4 rounded-lg shadow-sm border max-w-3xl">
+              <h2 className="text-lg font-semibold mb-3">Profile</h2>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs text-gray-600">First name</label>
+                  <input value={me.firstName} readOnly className="border p-2 rounded w-full bg-gray-50" />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-600">Last name</label>
+                  <input value={me.lastName} readOnly className="border p-2 rounded w-full bg-gray-50" />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-600">Role</label>
+                  <input value={`${me.accountRole} — ${me.jobRole}`} readOnly className="border p-2 rounded w-full bg-gray-50" />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-600">Clinic</label>
+                  <input value={`${me.clinic.name} (${me.clinic.location})`} readOnly className="border p-2 rounded w-full bg-gray-50" />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-600">Phone</label>
+                  <input value={me.phone} onChange={e=>setMe(prev=>({...prev, phone:e.target.value}))} className="border p-2 rounded w-full" />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-600">Email</label>
+                  <input value={me.email} onChange={e=>setMe(prev=>({...prev, email:e.target.value}))} className="border p-2 rounded w-full" />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-600">Employment status</label>
+                  <input value={me.employmentStatus} readOnly className="border p-2 rounded w-full bg-gray-50" />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-600">Staff type</label>
+                  <input
+                    value={me.staffCategory === 'Admin' ? 'Admin (license optional)' : 'Clinician (license required)'}
+                    readOnly
+                    className="border p-2 rounded w-full bg-gray-50"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-6">
+                <h3 className="text-sm font-semibold mb-2">License details</h3>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-gray-600">Practicing country</label>
+                    <select
+                      value={me.practiceCountry || 'KE'}
+                      onChange={e=>setMe(prev=>({...prev, practiceCountry: e.target.value }))}
+                      className="border p-2 rounded w-full"
+                    >
+                      <option value="KE">Kenya</option>
+                      <option value="UG">Uganda</option>
+                      <option value="TZ">Tanzania</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-600">License type</label>
+                    <select
+                      value={me.licenseType || ''}
+                      onChange={e=>setMe(prev=>({...prev, licenseType: e.target.value }))}
+                      className="border p-2 rounded w-full"
+                    >
+                      <option value="">Select license type</option>
+                      {(LICENSE_OPTIONS[me.practiceCountry || 'KE'] || []).map(t => (
+                        <option key={t} value={t}>{t}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-gray-600">License number</label>
+                    <input value={me.licenseNumber||''} onChange={e=>setMe(prev=>({...prev, licenseNumber:e.target.value}))} className="border p-2 rounded w-full" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-600">License expiry</label>
+                    <input type="date" value={me.licenseExpiry||''} onChange={e=>setMe(prev=>({...prev, licenseExpiry:e.target.value}))} className="border p-2 rounded w-full" />
+                  </div>
+                </div>
+                <div className={`text-xs mt-1 ${licenseExpired? 'text-red-600' : licenseExpiringSoon? 'text-amber-600' : 'text-gray-500'}`}>
+                  {'Expiry helper: '}{me.licenseExpiry || '—'}{licenseExpired ? ' (expired)' : licenseExpiringSoon ? ` (${licenseDays} days left)` : ''}
+                </div>
+              </div>
+
+              <div className="mt-6">
+                <h3 className="text-sm font-semibold mb-2">KYC files (demo)</h3>
+                <div className="grid grid-cols-2 gap-3 items-center">
+                  <div>
+                    <label className="text-xs text-gray-600">ID Card (image/PDF)</label>
+                    <input type="file" accept="image/*,application/pdf" onChange={e=> e.target.files?.[0] && onKycFile('idCard', e.target.files[0])} />
+                    {kycFiles.idCard && <div className="text-xs text-green-700 mt-1">ID uploaded</div>}
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-600">Professional License (image/PDF)</label>
+                    <input type="file" accept="image/*,application/pdf" onChange={e=> e.target.files?.[0] && onKycFile('license', e.target.files[0])} />
+                    {kycFiles.license && <div className="text-xs text-green-700 mt-1">License uploaded</div>}
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-4 flex items-center gap-3">
+                <button onClick={()=>{ localStorage.setItem(LS.me, JSON.stringify(me)); alert('Profile saved (demo)') }} className="px-3 py-2 rounded-md bg-blue-600 text-white text-sm">Save profile</button>
+                <span className="text-xs text-gray-500">Verification decisions are made by Admin/Owner.</span>
+              </div>
+            </div>
+          )}
+
+          {view==='notices' && (
+            <div className="bg-white p-4 rounded-lg shadow-sm border max-w-2xl">
+              <h2 className="text-lg font-semibold mb-3">Notifications</h2>
+              <ul className="space-y-2">
+                {notices.map(n => (
+                  <li key={n.id} className="p-2 border rounded">
+                    <div className="text-sm font-medium">{n.title}</div>
+                    <div className="text-xs text-gray-500">{n.when}</div>
+                    <div className="text-sm mt-1">{n.body}</div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </main>
+      </div>
+
+      {/* Leave Modal */}
+      {showLeaveModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black opacity-30" onClick={()=>setShowLeaveModal(false)} />
+          <div className="bg-white rounded-lg p-6 w-96 z-10">
+            <h3 className="text-lg font-semibold mb-3">Request Leave</h3>
+            <div className="space-y-2">
+              <div>
+                <label className="text-xs text-gray-600">Type</label>
+                <select className="w-full border p-2 rounded" value={newLeave.type} onChange={e=>setNewLeave(prev=>({...prev, type:e.target.value}))}>
+                  <option>Sick</option>
+                  <option>Annual</option>
+                  <option>Emergency</option>
+                  <option>Bereavement</option>
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-xs text-gray-600">From</label>
+                  <input type="date" className="w-full border p-2 rounded" value={newLeave.from} onChange={e=>setNewLeave(prev=>({...prev, from:e.target.value}))} />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-600">To</label>
+                  <input type="date" className="w-full border p-2 rounded" value={newLeave.to} onChange={e=>setNewLeave(prev=>({...prev, to:e.target.value}))} />
+                </div>
+              </div>
+              <div>
+                <label className="text-xs text-gray-600">Notes (optional)</label>
+                <textarea className="w-full border p-2 rounded" rows={3} value={newLeave.notes} onChange={e=>setNewLeave(prev=>({...prev, notes:e.target.value}))} />
+              </div>
+              <div className="flex justify-end gap-2 mt-3">
+                <button onClick={()=>setShowLeaveModal(false)} className="px-3 py-2 rounded-md bg-white border">Cancel</button>
+                <button onClick={submitLeave} className="px-3 py-2 rounded-md bg-blue-600 text-white">Submit</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+    </div>
+  );
+}

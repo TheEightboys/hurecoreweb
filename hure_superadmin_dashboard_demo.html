@@ -1,0 +1,1242 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>HURE SuperAdmin Demo</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  </head>
+  <body class="bg-slate-100">
+    <div id="root"></div>
+
+    <script type="text/babel">
+      const { useState, useEffect, useMemo } = React;
+
+      const PLAN_CONFIG = {
+        core: {
+          essential: { price: 8000, maxStaff: 10, maxLocations: 1, maxAdminRoles: 1, label: "Essential" },
+          professional: { price: 15000, maxStaff: 30, maxLocations: 2, maxAdminRoles: 3, label: "Professional" },
+          enterprise: { price: 25000, maxStaff: 75, maxLocations: 5, maxAdminRoles: 10, label: "Enterprise" }
+        },
+        care: {
+          care_standard: { price: 10000, maxStaff: 10, maxLocations: 1, maxAdminRoles: 1, label: "Care Standard" },
+          care_professional: { price: 18000, maxStaff: 30, maxLocations: 2, maxAdminRoles: 3, label: "Care Professional" },
+          care_enterprise: { price: 30000, maxStaff: 75, maxLocations: 5, maxAdminRoles: 10, label: "Care Enterprise" }
+        },
+        bundleDiscountPercent: 20
+      };
+
+      const LS_KEYS = {
+        clinics: "hure_superadmin_clinics",
+        pending: "hure_superadmin_pending",
+        transactions: "hure_superadmin_tx",
+        subscriptions: "hure_superadmin_subs",
+        promos: "hure_superadmin_promos",
+        audit: "hure_superadmin_audit",
+        siteContent: "hure_superadmin_content",
+        apiLogs: "hure_superadmin_api_logs"
+      };
+
+      function loadOrDefault(key, def) {
+        try {
+          const raw = window.localStorage.getItem(key);
+          if (!raw) return def;
+          const parsed = JSON.parse(raw);
+          return Array.isArray(def) && !Array.isArray(parsed) ? def : parsed;
+        } catch (e) {
+          console.warn("Failed to load", key, e);
+          return def;
+        }
+      }
+
+      function HureSuperadminApp() {
+        const defaultClinics = [
+          {
+            id: 1,
+            name: "Westlands Clinic",
+            ownerName: "Sajid",
+            email: "info@westlands.clinic",
+            country: "Kenya",
+            modules: ["core"],
+            planKey: "professional",
+            planProduct: "core",
+            isBundle: false,
+            status: "active",
+            createdAt: "2025-10-01",
+            staffCount: 18,
+            locationCount: 2,
+            adminRoleCount: 2,
+            careProvisioned: false
+          },
+          {
+            id: 2,
+            name: "Rusinga Health",
+            ownerName: "Mary",
+            email: "info@rusinga.health",
+            country: "Kenya",
+            modules: ["core", "care"],
+            planKey: "professional",
+            planProduct: "core",
+            isBundle: true,
+            status: "active",
+            createdAt: "2025-09-20",
+            staffCount: 26,
+            locationCount: 2,
+            adminRoleCount: 3,
+            careProvisioned: true
+          },
+          {
+            id: 3,
+            name: "Kisumu Dental",
+            ownerName: "Peter",
+            email: "info@kisumudental.ke",
+            country: "Kenya",
+            modules: ["care"],
+            planKey: "care_standard",
+            planProduct: "care",
+            isBundle: false,
+            status: "active",
+            createdAt: "2025-10-10",
+            staffCount: 7,
+            locationCount: 1,
+            adminRoleCount: 1,
+            careProvisioned: true
+          }
+        ];
+
+        const defaultPending = [
+          {
+            id: 101,
+            name: "Sunrise Medical",
+            ownerName: "Dr. Achieng",
+            email: "hello@sunrise.ke",
+            country: "Kenya",
+            modules: ["core"],
+            planKey: "essential",
+            planProduct: "core",
+            isBundle: false,
+            status: "pending_activation",
+            createdAt: "2025-11-25"
+          },
+          {
+            id: 102,
+            name: "Nairobi Family Care",
+            ownerName: "Dr. Kamau",
+            email: "admin@nfc.ke",
+            country: "Kenya",
+            modules: ["core", "care"],
+            planKey: "enterprise",
+            planProduct: "core",
+            isBundle: true,
+            status: "pending_payment",
+            createdAt: "2025-11-27"
+          },
+          {
+            id: 103,
+            name: "Homabay Wellness",
+            ownerName: "Grace",
+            email: "office@hbwellness.ke",
+            country: "Kenya",
+            modules: ["care"],
+            planKey: "care_professional",
+            planProduct: "care",
+            isBundle: false,
+            status: "pending_verification",
+            createdAt: "2025-11-28"
+          }
+        ];
+
+        function bundleAmounts(corePlanKey, carePlanKey) {
+          const corePlan = PLAN_CONFIG.core[corePlanKey];
+          const carePlan = PLAN_CONFIG.care[carePlanKey];
+          if (!corePlan || !carePlan) return { base: 0, final: 0, discountPercent: PLAN_CONFIG.bundleDiscountPercent };
+          const base = corePlan.price + carePlan.price;
+          const final = Math.round(base * (1 - PLAN_CONFIG.bundleDiscountPercent / 100));
+          return { base, final, discountPercent: PLAN_CONFIG.bundleDiscountPercent };
+        }
+
+        const defaultTransactions = [
+          {
+            id: "TX-CORE-001",
+            clinicId: 1,
+            clinicName: "Westlands Clinic",
+            modules: ["core"],
+            baseAmount: PLAN_CONFIG.core.professional.price,
+            discountPercent: 0,
+            finalAmount: PLAN_CONFIG.core.professional.price,
+            method: "M-Pesa",
+            status: "Success",
+            createdAt: "2025-10-01 10:21"
+          },
+          (function () {
+            const b = bundleAmounts("professional", "care_standard");
+            return {
+              id: "TX-BUNDLE-001",
+              clinicId: 2,
+              clinicName: "Rusinga Health",
+              modules: ["core", "care"],
+              baseAmount: b.base,
+              discountPercent: b.discountPercent,
+              finalAmount: b.final,
+              method: "Card",
+              status: "Success",
+              createdAt: "2025-09-20 09:02"
+            };
+          })(),
+          {
+            id: "TX-CARE-001",
+            clinicId: 3,
+            clinicName: "Kisumu Dental",
+            modules: ["care"],
+            baseAmount: PLAN_CONFIG.care.care_standard.price,
+            discountPercent: 0,
+            finalAmount: PLAN_CONFIG.care.care_standard.price,
+            method: "M-Pesa",
+            status: "Success",
+            createdAt: "2025-10-10 14:45"
+          }
+        ];
+
+        const defaultSubscriptions = [
+          {
+            id: "SUB-CORE-001",
+            clinicId: 1,
+            clinicName: "Westlands Clinic",
+            planKey: "professional",
+            planProduct: "core",
+            modules: ["core"],
+            isBundle: false,
+            status: "active",
+            renewalAmount: PLAN_CONFIG.core.professional.price,
+            billingCycle: "monthly",
+            nextRenewalAt: "2026-01-01",
+            trialEndsAt: null,
+            careProvisioned: false
+          },
+          (function () {
+            const b = bundleAmounts("professional", "care_standard");
+            return {
+              id: "SUB-BUNDLE-001",
+              clinicId: 2,
+              clinicName: "Rusinga Health",
+              planKey: "professional",
+              planProduct: "core",
+              modules: ["core", "care"],
+              isBundle: true,
+              status: "active",
+              renewalAmount: b.final,
+              billingCycle: "monthly",
+              nextRenewalAt: "2026-01-05",
+              trialEndsAt: "2025-12-15",
+              careProvisioned: true
+            };
+          })(),
+          {
+            id: "SUB-CARE-001",
+            clinicId: 3,
+            clinicName: "Kisumu Dental",
+            planKey: "care_standard",
+            planProduct: "care",
+            modules: ["care"],
+            isBundle: false,
+            status: "active",
+            renewalAmount: PLAN_CONFIG.care.care_standard.price,
+            billingCycle: "monthly",
+            nextRenewalAt: "2026-01-03",
+            trialEndsAt: null,
+            careProvisioned: true
+          }
+        ];
+
+        const defaultPromos = [
+          { id: 1, code: "LAUNCH20", discountPercent: 20, expiresAt: "2026-01-01", active: true }
+        ];
+
+        const defaultApiLogs = [
+          { id: 1, endpoint: "/bundle/provision", statusCode: 200, at: "2025-11-28 09:15", note: "Provisioned Care + Core for Rusinga Health" },
+          { id: 2, endpoint: "/care/tenant_created", statusCode: 200, at: "2025-11-28 09:16", note: "care_123 created" },
+          { id: 3, endpoint: "/payments/pesapal/callback", statusCode: 200, at: "2025-11-28 09:17", note: "TX-BUNDLE-001 confirmed" }
+        ];
+
+        const defaultSiteContent = {
+          heroHeadline: "From staff to patients, we’ve got you covered.",
+          bundleBlurb: "Bundle Core + Care and save 20% every month."
+        };
+
+        const [clinics, setClinics] = useState(() => loadOrDefault(LS_KEYS.clinics, defaultClinics));
+        const [pendingClinics, setPendingClinics] = useState(() => loadOrDefault(LS_KEYS.pending, defaultPending));
+        const [transactions, setTransactions] = useState(() => loadOrDefault(LS_KEYS.transactions, defaultTransactions));
+        const [subscriptions, setSubscriptions] = useState(() => loadOrDefault(LS_KEYS.subscriptions, defaultSubscriptions));
+        const [promos, setPromos] = useState(() => loadOrDefault(LS_KEYS.promos, defaultPromos));
+        const [audit, setAudit] = useState(() => loadOrDefault(LS_KEYS.audit, []));
+        const [apiLogs, setApiLogs] = useState(() => loadOrDefault(LS_KEYS.apiLogs, defaultApiLogs));
+        const [siteContent, setSiteContent] = useState(() => loadOrDefault(LS_KEYS.siteContent, defaultSiteContent));
+
+        const [activeTab, setActiveTab] = useState("Dashboard");
+        const [selectedClinicId, setSelectedClinicId] = useState(defaultClinics[0]?.id || null);
+        const [pendingFilter, setPendingFilter] = useState("");
+        const [clinicFilter, setClinicFilter] = useState("all");
+        const [auditFilterType, setAuditFilterType] = useState("all");
+
+        useEffect(() => {
+          window.localStorage.setItem(LS_KEYS.clinics, JSON.stringify(clinics));
+        }, [clinics]);
+
+        useEffect(() => {
+          window.localStorage.setItem(LS_KEYS.pending, JSON.stringify(pendingClinics));
+        }, [pendingClinics]);
+
+        useEffect(() => {
+          window.localStorage.setItem(LS_KEYS.transactions, JSON.stringify(transactions));
+        }, [transactions]);
+
+        useEffect(() => {
+          window.localStorage.setItem(LS_KEYS.subscriptions, JSON.stringify(subscriptions));
+        }, [subscriptions]);
+
+        useEffect(() => {
+          window.localStorage.setItem(LS_KEYS.promos, JSON.stringify(promos));
+        }, [promos]);
+
+        useEffect(() => {
+          window.localStorage.setItem(LS_KEYS.audit, JSON.stringify(audit));
+        }, [audit]);
+
+        useEffect(() => {
+          window.localStorage.setItem(LS_KEYS.apiLogs, JSON.stringify(apiLogs));
+        }, [apiLogs]);
+
+        useEffect(() => {
+          window.localStorage.setItem(LS_KEYS.siteContent, JSON.stringify(siteContent));
+        }, [siteContent]);
+
+        function logAudit(type, details) {
+          const entry = { id: Date.now(), type, details, at: new Date().toISOString() };
+          setAudit(prev => [entry, ...prev]);
+        }
+
+        function planLabel(planProduct, planKey) {
+          if (planProduct === "core") return PLAN_CONFIG.core[planKey]?.label || planKey;
+          if (planProduct === "care") return PLAN_CONFIG.care[planKey]?.label || planKey;
+          return planKey;
+        }
+
+        function modulesLabel(mods, isBundle) {
+          const base = mods.join(" + ");
+          return isBundle ? base + " (Bundle -20%)" : base;
+        }
+
+        function updatePendingStatus(id, newStatus) {
+          setPendingClinics(prev => prev.map(c => (c.id === id ? { ...c, status: newStatus } : c)));
+          logAudit("pending_status_change", { id, newStatus });
+        }
+
+        function activatePending(id) {
+          const pending = pendingClinics.find(p => p.id === id);
+          if (!pending) return;
+          const newClinicId = clinics.length ? Math.max(...clinics.map(c => c.id)) + 1 : 1;
+          const newClinic = {
+            id: newClinicId,
+            name: pending.name,
+            ownerName: pending.ownerName,
+            email: pending.email,
+            country: pending.country,
+            modules: pending.modules,
+            planKey: pending.planKey,
+            planProduct: pending.planProduct,
+            isBundle: pending.isBundle,
+            status: "active",
+            createdAt: pending.createdAt,
+            staffCount: 0,
+            locationCount: 1,
+            adminRoleCount: 1,
+            careProvisioned: pending.modules.includes("care")
+          };
+          setClinics(prev => [...prev, newClinic]);
+
+          const newSubId = "SUB-" + String(Date.now());
+          let renewalAmount = 0;
+          if (pending.isBundle && pending.modules.includes("core") && pending.modules.includes("care")) {
+            const corePlan = pending.planKey;
+            const carePlan = "care_standard";
+            const b = bundleAmounts(corePlan, carePlan);
+            renewalAmount = b.final;
+          } else if (pending.planProduct === "core") {
+            renewalAmount = PLAN_CONFIG.core[pending.planKey]?.price || 0;
+          } else if (pending.planProduct === "care") {
+            renewalAmount = PLAN_CONFIG.care[pending.planKey]?.price || 0;
+          }
+
+          const newSub = {
+            id: newSubId,
+            clinicId: newClinicId,
+            clinicName: pending.name,
+            planKey: pending.planKey,
+            planProduct: pending.planProduct,
+            modules: pending.modules,
+            isBundle: pending.isBundle,
+            status: "active",
+            renewalAmount,
+            billingCycle: "monthly",
+            nextRenewalAt: "2026-01-10",
+            trialEndsAt: null,
+            careProvisioned: pending.modules.includes("care")
+          };
+          setSubscriptions(prev => [...prev, newSub]);
+
+          updatePendingStatus(id, "activated");
+          logAudit("clinic_activated", { pendingId: id, newClinicId });
+        }
+
+        function suspendClinic(id) {
+          setClinics(prev => prev.map(c => (c.id === id ? { ...c, status: "suspended" } : c)));
+          logAudit("clinic_suspended", { id });
+        }
+
+        const selectedClinic = useMemo(
+          () => clinics.find(c => c.id === selectedClinicId) || null,
+          [clinics, selectedClinicId]
+        );
+
+        const filteredPending = useMemo(() => {
+          if (pendingFilter === "") return pendingClinics;
+          return pendingClinics.filter(p => p.status === pendingFilter);
+        }, [pendingClinics, pendingFilter]);
+
+        const filteredClinics = useMemo(() => {
+          if (clinicFilter === "all") return clinics;
+          if (clinicFilter === "bundle") return clinics.filter(c => c.isBundle);
+          if (clinicFilter === "core") return clinics.filter(c => c.modules.length === 1 && c.modules[0] === "core");
+          if (clinicFilter === "care") return clinics.filter(c => c.modules.length === 1 && c.modules[0] === "care");
+          return clinics;
+        }, [clinics, clinicFilter]);
+
+        const notifications = useMemo(() => {
+          const items = [];
+          subscriptions.forEach(sub => {
+            if (sub.isBundle) {
+              items.push({
+                id: "notif-bundle-" + sub.id,
+                type: "bundle",
+                text: sub.clinicName + " has an active Core + Care bundle."
+              });
+            }
+            if (sub.status === "pending_activation") {
+              items.push({
+                id: "notif-pend-" + sub.id,
+                type: "activation",
+                text: sub.clinicName + " is pending activation."
+              });
+            }
+          });
+          clinics.forEach(c => {
+            if (c.status === "suspended") {
+              items.push({
+                id: "notif-susp-" + c.id,
+                type: "suspended",
+                text: c.name + " is suspended."
+              });
+            }
+            const productConfig =
+              c.planProduct === "core"
+                ? PLAN_CONFIG.core[c.planKey]
+                : PLAN_CONFIG.care[c.planKey];
+            if (productConfig) {
+              const ratio = c.staffCount / productConfig.maxStaff;
+              if (ratio >= 0.8) {
+                items.push({
+                  id: "notif-limit-" + c.id,
+                  type: "limit",
+                  text: c.name + " is near staff limit (" + c.staffCount + "/" + productConfig.maxStaff + ")."
+                });
+              }
+            }
+          });
+          return items;
+        }, [subscriptions, clinics]);
+
+        const filteredAudit = useMemo(() => {
+          if (auditFilterType === "all") return audit;
+          return audit.filter(a => a.type === auditFilterType);
+        }, [audit, auditFilterType]);
+
+        function DashboardTab() {
+          const totalClinics = clinics.length;
+          const activeClinics = clinics.filter(c => c.status === "active").length;
+          const bundleClinics = clinics.filter(c => c.isBundle).length;
+          const careOnly = clinics.filter(c => c.modules.length === 1 && c.modules[0] === "care").length;
+
+          return (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <StatCard label="Total clinics" value={totalClinics} />
+                <StatCard label="Active clinics" value={activeClinics} />
+                <StatCard label="Active bundles (Core+Care)" value={bundleClinics} />
+                <StatCard label="Care-only clinics" value={careOnly} />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-white border rounded-lg p-4">
+                  <h2 className="font-semibold text-sm mb-2">Core plans</h2>
+                  <div className="space-y-2 text-sm">
+                    {Object.entries(PLAN_CONFIG.core).map(([key, cfg]) => (
+                      <div key={key} className="flex justify-between">
+                        <span>{cfg.label}</span>
+                        <span>
+                          KSh {cfg.price.toLocaleString()} · {cfg.maxStaff} staff · {cfg.maxLocations} locations ·{" "}
+                          {cfg.maxAdminRoles} admin roles
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="bg-white border rounded-lg p-4">
+                  <h2 className="font-semibold text-sm mb-2">Care plans</h2>
+                  <div className="space-y-2 text-sm">
+                    {Object.entries(PLAN_CONFIG.care).map(([key, cfg]) => (
+                      <div key={key} className="flex justify-between">
+                        <span>{cfg.label}</span>
+                        <span>
+                          KSh {cfg.price.toLocaleString()} · {cfg.maxStaff} staff · {cfg.maxLocations} locations ·{" "}
+                          {cfg.maxAdminRoles} admin roles
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white border rounded-lg p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <h2 className="font-semibold text-sm">Recent audit events</h2>
+                  <span className="text-xs text-slate-500">Last {Math.min(5, audit.length)} actions</span>
+                </div>
+                <ul className="text-sm max-h-40 overflow-auto">
+                  {audit.slice(0, 5).map(item => (
+                    <li key={item.id} className="py-1 border-b last:border-b-0">
+                      <div className="font-medium">{item.type}</div>
+                      <div className="text-xs text-slate-500">{item.at}</div>
+                      <div className="text-xs text-slate-600 break-all">
+                        {JSON.stringify(item.details)}
+                      </div>
+                    </li>
+                  ))}
+                  {audit.length === 0 && (
+                    <li className="text-xs text-slate-500">No audit events yet.</li>
+                  )}
+                </ul>
+              </div>
+            </div>
+          );
+        }
+
+        function PendingTab() {
+          return (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="font-semibold text-sm">Pending clinics</h2>
+                <div className="flex items-center gap-2 text-xs">
+                  <span>Status:</span>
+                  <select
+                    className="border rounded px-2 py-1 text-xs"
+                    value={pendingFilter}
+                    onChange={e => setPendingFilter(e.target.value)}
+                  >
+                    <option value="">All</option>
+                    <option value="pending_verification">Pending verification</option>
+                    <option value="pending_payment">Pending payment</option>
+                    <option value="pending_activation">Pending activation</option>
+                    <option value="activated">Activated (history)</option>
+                  </select>
+                </div>
+              </div>
+              <div className="bg-white border rounded-lg overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead className="bg-slate-50 text-left text-xs text-slate-500 border-b">
+                    <tr>
+                      <th className="px-3 py-2">Clinic</th>
+                      <th className="px-3 py-2">Owner</th>
+                      <th className="px-3 py-2">Email</th>
+                      <th className="px-3 py-2">Country</th>
+                      <th className="px-3 py-2">Modules</th>
+                      <th className="px-3 py-2">Plan</th>
+                      <th className="px-3 py-2">Status</th>
+                      <th className="px-3 py-2">Created</th>
+                      <th className="px-3 py-2"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredPending.map(p => (
+                      <tr key={p.id} className="border-t">
+                        <td className="px-3 py-2">{p.name}</td>
+                        <td className="px-3 py-2">{p.ownerName}</td>
+                        <td className="px-3 py-2">{p.email}</td>
+                        <td className="px-3 py-2">{p.country}</td>
+                        <td className="px-3 py-2 text-xs">
+                          {modulesLabel(p.modules, p.isBundle)}
+                        </td>
+                        <td className="px-3 py-2 text-xs">
+                          {planLabel(p.planProduct, p.planKey)}
+                        </td>
+                        <td className="px-3 py-2 text-xs">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-100">
+                            {p.status}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 text-xs">{p.createdAt}</td>
+                        <td className="px-3 py-2">
+                          <div className="flex gap-2">
+                            <button
+                              className="px-2 py-1 text-xs rounded bg-emerald-600 text-white"
+                              onClick={() => activatePending(p.id)}
+                            >
+                              Activate
+                            </button>
+                            <button
+                              className="px-2 py-1 text-xs rounded border"
+                              onClick={() => updatePendingStatus(p.id, "rejected")}
+                            >
+                              Reject
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                    {filteredPending.length === 0 && (
+                      <tr>
+                        <td className="px-3 py-4 text-xs text-slate-500" colSpan={9}>
+                          No pending clinics for this filter.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          );
+        }
+
+        function ClinicsTab() {
+          return (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              <div className="lg:col-span-2 space-y-2">
+                <div className="flex items-center justify-between">
+                  <h2 className="font-semibold text-sm">Clinics</h2>
+                  <select
+                    className="border rounded px-2 py-1 text-xs"
+                    value={clinicFilter}
+                    onChange={e => setClinicFilter(e.target.value)}
+                  >
+                    <option value="all">All</option>
+                    <option value="core">Core only</option>
+                    <option value="care">Care only</option>
+                    <option value="bundle">Core + Care (bundle)</option>
+                  </select>
+                </div>
+                <div className="bg-white border rounded-lg overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead className="bg-slate-50 text-left text-xs text-slate-500 border-b">
+                      <tr>
+                        <th className="px-3 py-2">Clinic</th>
+                        <th className="px-3 py-2">Modules</th>
+                        <th className="px-3 py-2">Plan</th>
+                        <th className="px-3 py-2">Status</th>
+                        <th className="px-3 py-2">Created</th>
+                        <th className="px-3 py-2"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredClinics.map(c => (
+                        <tr key={c.id} className="border-t">
+                          <td className="px-3 py-2">
+                            <div className="font-medium text-sm">{c.name}</div>
+                            <div className="text-xs text-slate-500">{c.email}</div>
+                          </td>
+                          <td className="px-3 py-2 text-xs">
+                            {modulesLabel(c.modules, c.isBundle)}
+                          </td>
+                          <td className="px-3 py-2 text-xs">
+                            {planLabel(c.planProduct, c.planKey)}
+                          </td>
+                          <td className="px-3 py-2 text-xs">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100">
+                              {c.status}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2 text-xs">{c.createdAt}</td>
+                          <td className="px-3 py-2">
+                            <div className="flex gap-2">
+                              <button
+                                className="px-2 py-1 text-xs rounded border"
+                                onClick={() => setSelectedClinicId(c.id)}
+                              >
+                                View
+                              </button>
+                              {c.status !== "suspended" && (
+                                <button
+                                  className="px-2 py-1 text-xs rounded bg-rose-50 text-rose-700 border border-rose-100"
+                                  onClick={() => suspendClinic(c.id)}
+                                >
+                                  Suspend
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                      {filteredClinics.length === 0 && (
+                        <tr>
+                          <td className="px-3 py-4 text-xs text-slate-500" colSpan={6}>
+                            No clinics for this filter.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div className="bg-white border rounded-lg p-4">
+                <h2 className="font-semibold text-sm mb-2">Clinic details</h2>
+                {!selectedClinic && (
+                  <div className="text-xs text-slate-500">Select a clinic from the table.</div>
+                )}
+                {selectedClinic && (
+                  <div className="space-y-3 text-sm">
+                    <div>
+                      <div className="font-semibold">{selectedClinic.name}</div>
+                      <div className="text-xs text-slate-500">
+                        {selectedClinic.email} · {selectedClinic.country}
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div className="bg-slate-50 rounded p-2">
+                        <div className="text-slate-500">Plan</div>
+                        <div className="font-medium">
+                          {planLabel(selectedClinic.planProduct, selectedClinic.planKey)}
+                        </div>
+                      </div>
+                      <div className="bg-slate-50 rounded p-2">
+                        <div className="text-slate-500">Modules</div>
+                        <div className="font-medium">
+                          {modulesLabel(selectedClinic.modules, selectedClinic.isBundle)}
+                        </div>
+                      </div>
+                      <div className="bg-slate-50 rounded p-2">
+                        <div className="text-slate-500">Staff</div>
+                        <div className="font-medium">{selectedClinic.staffCount}</div>
+                      </div>
+                      <div className="bg-slate-50 rounded p-2">
+                        <div className="text-slate-500">Locations</div>
+                        <div className="font-medium">{selectedClinic.locationCount}</div>
+                      </div>
+                      <div className="bg-slate-50 rounded p-2">
+                        <div className="text-slate-500">Admin roles</div>
+                        <div className="font-medium">{selectedClinic.adminRoleCount}</div>
+                      </div>
+                      <div className="bg-slate-50 rounded p-2">
+                        <div className="text-slate-500">Care provisioned?</div>
+                        <div className="font-medium">
+                          {selectedClinic.careProvisioned ? "Yes" : "No"}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-xs text-slate-500">
+                      Limits are derived from the plan configuration – the employer portal must enforce max staff, locations, and admin roles.
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        }
+
+        function TransactionsTab() {
+          return (
+            <div className="space-y-3">
+              <h2 className="font-semibold text-sm">Transactions & payments</h2>
+              <div className="bg-white border rounded-lg overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead className="bg-slate-50 text-left text-xs text-slate-500 border-b">
+                    <tr>
+                      <th className="px-3 py-2">Tx ID</th>
+                      <th className="px-3 py-2">Clinic</th>
+                      <th className="px-3 py-2">Modules</th>
+                      <th className="px-3 py-2">Base</th>
+                      <th className="px-3 py-2">Discount</th>
+                      <th className="px-3 py-2">Final</th>
+                      <th className="px-3 py-2">Method</th>
+                      <th className="px-3 py-2">Status</th>
+                      <th className="px-3 py-2">Time</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {transactions.map(t => (
+                      <tr key={t.id} className="border-t">
+                        <td className="px-3 py-2 text-xs">{t.id}</td>
+                        <td className="px-3 py-2 text-xs">{t.clinicName}</td>
+                        <td className="px-3 py-2 text-xs">{t.modules.join(" + ")}</td>
+                        <td className="px-3 py-2 text-xs">
+                          KSh {Number(t.baseAmount || 0).toLocaleString()}
+                        </td>
+                        <td className="px-3 py-2 text-xs">
+                          {t.discountPercent ? t.discountPercent + "%" : "0%"}
+                        </td>
+                        <td className="px-3 py-2 text-xs">
+                          KSh {Number(t.finalAmount || 0).toLocaleString()}
+                        </td>
+                        <td className="px-3 py-2 text-xs">{t.method}</td>
+                        <td className="px-3 py-2 text-xs">{t.status}</td>
+                        <td className="px-3 py-2 text-xs">{t.createdAt}</td>
+                      </tr>
+                    ))}
+                    {transactions.length === 0 && (
+                      <tr>
+                        <td className="px-3 py-4 text-xs text-slate-500" colSpan={9}>
+                          No transactions yet.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          );
+        }
+
+        function SubscriptionsTab() {
+          return (
+            <div className="space-y-3">
+              <h2 className="font-semibold text-sm">Subscriptions</h2>
+              <div className="bg-white border rounded-lg overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead className="bg-slate-50 text-left text-xs text-slate-500 border-b">
+                    <tr>
+                      <th className="px-3 py-2">Clinic</th>
+                      <th className="px-3 py-2">Plan</th>
+                      <th className="px-3 py-2">Modules</th>
+                      <th className="px-3 py-2">Bundle?</th>
+                      <th className="px-3 py-2">Status</th>
+                      <th className="px-3 py-2">Billing</th>
+                      <th className="px-3 py-2">Renewal</th>
+                      <th className="px-3 py-2">Trial</th>
+                      <th className="px-3 py-2">Care provisioned</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {subscriptions.map(s => (
+                      <tr key={s.id} className="border-t">
+                        <td className="px-3 py-2 text-xs">{s.clinicName}</td>
+                        <td className="px-3 py-2 text-xs">
+                          {planLabel(s.planProduct, s.planKey)}
+                        </td>
+                        <td className="px-3 py-2 text-xs">
+                          {modulesLabel(s.modules, s.isBundle)}
+                        </td>
+                        <td className="px-3 py-2 text-xs">
+                          {s.isBundle ? "Yes" : "No"}
+                        </td>
+                        <td className="px-3 py-2 text-xs">{s.status}</td>
+                        <td className="px-3 py-2 text-xs">
+                          {s.billingCycle === "yearly" ? "Yearly" : "Monthly"}
+                        </td>
+                        <td className="px-3 py-2 text-xs">
+                          KSh {Number(s.renewalAmount || 0).toLocaleString()} on {s.nextRenewalAt}
+                        </td>
+                        <td className="px-3 py-2 text-xs">
+                          {s.trialEndsAt ? "Ends " + s.trialEndsAt : "—"}
+                        </td>
+                        <td className="px-3 py-2 text-xs">
+                          {s.careProvisioned ? "Yes" : "No"}
+                        </td>
+                      </tr>
+                    ))}
+                    {subscriptions.length === 0 && (
+                      <tr>
+                        <td className="px-3 py-4 text-xs text-slate-500" colSpan={9}>
+                          No subscriptions yet.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          );
+        }
+
+        function PromosTab() {
+          const [code, setCode] = useState("");
+          const [discount, setDiscount] = useState(10);
+          const [expiresAt, setExpiresAt] = useState("");
+
+          function createPromo() {
+            if (!code) return;
+            const id = promos.length ? Math.max(...promos.map(p => p.id)) + 1 : 1;
+            const promo = { id, code, discountPercent: Number(discount) || 0, expiresAt, active: true };
+            setPromos(prev => [promo, ...prev]);
+            logAudit("promo_created", { id, code });
+            setCode("");
+            setDiscount(10);
+            setExpiresAt("");
+          }
+
+          function togglePromo(id) {
+            setPromos(prev =>
+              prev.map(p => (p.id === id ? { ...p, active: !p.active } : p))
+            );
+            logAudit("promo_toggled", { id });
+          }
+
+          return (
+            <div className="space-y-4">
+              <h2 className="font-semibold text-sm">Promo codes</h2>
+              <div className="bg-white border rounded-lg p-4 space-y-3">
+                <div className="flex flex-wrap gap-2 text-sm">
+                  <input
+                    className="border rounded px-2 py-1 flex-1 min-w-[120px]"
+                    placeholder="CODE"
+                    value={code}
+                    onChange={e => setCode(e.target.value.toUpperCase())}
+                  />
+                  <input
+                    className="border rounded px-2 py-1 w-24"
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={discount}
+                    onChange={e => setDiscount(e.target.value)}
+                    placeholder="%"
+                  />
+                  <input
+                    className="border rounded px-2 py-1 w-40"
+                    placeholder="YYYY-MM-DD"
+                    value={expiresAt}
+                    onChange={e => setExpiresAt(e.target.value)}
+                  />
+                  <button
+                    className="px-3 py-1 rounded bg-blue-600 text-white text-sm"
+                    onClick={createPromo}
+                  >
+                    Create
+                  </button>
+                </div>
+
+                <div className="border-t pt-3">
+                  <ul className="space-y-2 text-sm">
+                    {promos.map(p => (
+                      <li
+                        key={p.id}
+                        className="flex items-center justify-between border rounded px-3 py-2"
+                      >
+                        <div>
+                          <div className="font-medium">{p.code}</div>
+                          <div className="text-xs text-slate-500">
+                            {p.discountPercent}% · Expires {p.expiresAt || "—"}
+                          </div>
+                        </div>
+                        <button
+                          className="px-2 py-1 text-xs rounded border"
+                          onClick={() => togglePromo(p.id)}
+                        >
+                          {p.active ? "Deactivate" : "Activate"}
+                        </button>
+                      </li>
+                    ))}
+                    {promos.length === 0 && (
+                      <li className="text-xs text-slate-500">No promos yet.</li>
+                    )}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          );
+        }
+
+        function AuditTab() {
+          const uniqueTypes = Array.from(new Set(audit.map(a => a.type)));
+
+          return (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h2 className="font-semibold text-sm">Audit log</h2>
+                <div className="flex items-center gap-2 text-xs">
+                  <span>Filter:</span>
+                  <select
+                    className="border rounded px-2 py-1 text-xs"
+                    value={auditFilterType}
+                    onChange={e => setAuditFilterType(e.target.value)}
+                  >
+                    <option value="all">All types</option>
+                    {uniqueTypes.map(t => (
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="bg-white border rounded-lg p-3 max-h-80 overflow-auto text-sm">
+                {filteredAudit.map(a => (
+                  <div key={a.id} className="border-b last:border-b-0 py-2">
+                    <div className="font-medium">{a.type}</div>
+                    <div className="text-xs text-slate-500">{a.at}</div>
+                    <pre className="text-xs text-slate-700 mt-1 whitespace-pre-wrap break-all">
+                      {JSON.stringify(a.details, null, 2)}
+                    </pre>
+                  </div>
+                ))}
+                {filteredAudit.length === 0 && (
+                  <div className="text-xs text-slate-500">No audit entries for this filter.</div>
+                )}
+              </div>
+            </div>
+          );
+        }
+
+        function NotificationsTab() {
+          return (
+            <div className="space-y-3">
+              <h2 className="font-semibold text-sm">Alerts & notifications</h2>
+              <div className="bg-white border rounded-lg p-3 text-sm space-y-2">
+                {notifications.map(n => (
+                  <div
+                    key={n.id}
+                    className="border rounded px-3 py-2 flex items-start gap-2 bg-slate-50"
+                  >
+                    <div className="text-xs uppercase text-slate-500">{n.type}</div>
+                    <div>{n.text}</div>
+                  </div>
+                ))}
+                {notifications.length === 0 && (
+                  <div className="text-xs text-slate-500">No alerts right now.</div>
+                )}
+              </div>
+            </div>
+          );
+        }
+
+        function SiteContentTab() {
+          function updateField(field, value) {
+            setSiteContent(prev => ({ ...prev, [field]: value }));
+            logAudit("site_content_updated", { field, value });
+          }
+
+          return (
+            <div className="space-y-4">
+              <h2 className="font-semibold text-sm">Marketing site content</h2>
+              <div className="bg-white border rounded-lg p-4 space-y-4 text-sm">
+                <div>
+                  <label className="block text-xs text-slate-600 mb-1">
+                    Hero headline (gethure.com)
+                  </label>
+                  <input
+                    className="border rounded px-3 py-2 w-full"
+                    value={siteContent.heroHeadline}
+                    onChange={e => updateField("heroHeadline", e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-slate-600 mb-1">
+                    Bundle blurb (Core + Care)
+                  </label>
+                  <textarea
+                    className="border rounded px-3 py-2 w-full min-h-[80px]"
+                    value={siteContent.bundleBlurb}
+                    onChange={e => updateField("bundleBlurb", e.target.value)}
+                  />
+                </div>
+                <div className="text-xs text-slate-500">
+                  The marketing site can pull this content via a JSON endpoint, e.g.{" "}
+                  <code className="bg-slate-100 px-1 rounded">/api/site-content</code>. SuperAdmin
+                  remains the single source of truth for pricing copy and bundle messaging.
+                </div>
+              </div>
+            </div>
+          );
+        }
+
+        function ApiLogsTab() {
+          return (
+            <div className="space-y-3">
+              <h2 className="font-semibold text-sm">API logs (integration)</h2>
+              <div className="bg-white border rounded-lg p-3 text-sm max-h-80 overflow-auto">
+                {apiLogs.map(l => (
+                  <div key={l.id} className="border-b last:border-b-0 py-2">
+                    <div className="flex justify-between text-xs text-slate-500">
+                      <span>{l.endpoint}</span>
+                      <span>{l.at}</span>
+                    </div>
+                    <div className="text-xs">
+                      Status:{" "}
+                      <span className="font-medium">{l.statusCode}</span> · {l.note}
+                    </div>
+                  </div>
+                ))}
+                {apiLogs.length === 0 && (
+                  <div className="text-xs text-slate-500">No API logs yet.</div>
+                )}
+              </div>
+            </div>
+          );
+        }
+
+        function SettingsTab() {
+          return (
+            <div className="space-y-4 text-sm">
+              <div className="bg-white border rounded-lg p-4 space-y-2">
+                <h2 className="font-semibold text-sm mb-1">Billing configuration</h2>
+                <div className="text-xs text-slate-600">
+                  Gateway: Pesapal (M-Pesa + Card) · Trial: 14 days · Bundle discount:{" "}
+                  {PLAN_CONFIG.bundleDiscountPercent}%
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                  <div>
+                    <h3 className="font-semibold text-xs mb-1">Core plans</h3>
+                    <ul className="text-xs space-y-1">
+                      {Object.entries(PLAN_CONFIG.core).map(([key, cfg]) => (
+                        <li key={key}>
+                          {cfg.label}: KSh {cfg.price.toLocaleString()} · {cfg.maxStaff} staff ·{" "}
+                          {cfg.maxLocations} locations · {cfg.maxAdminRoles} admin roles
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-xs mb-1">Care plans</h3>
+                    <ul className="text-xs space-y-1">
+                      {Object.entries(PLAN_CONFIG.care).map(([key, cfg]) => (
+                        <li key={key}>
+                          {cfg.label}: KSh {cfg.price.toLocaleString()} · {cfg.maxStaff} staff ·{" "}
+                          {cfg.maxLocations} locations · {cfg.maxAdminRoles} admin roles
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white border rounded-lg p-4 space-y-2">
+                <h2 className="font-semibold text-sm mb-1">Linked products / other HURE apps</h2>
+                <div className="text-xs text-slate-600 mb-2">
+                  Core SuperAdmin is the global billing + tenant registry. Other HURE apps (like
+                  Care) are linked here for provisioning and deep-links.
+                </div>
+                <ul className="text-sm space-y-2">
+                  <li className="flex items-center justify-between border rounded px-3 py-2">
+                    <div>
+                      <div className="font-medium">HURE Care – Open SuperAdmin</div>
+                      <div className="text-xs text-slate-500">
+                        Configure Care-only plans, clinical settings, and EMR features.
+                      </div>
+                    </div>
+                    <button className="px-3 py-1 text-xs rounded border bg-slate-50">
+                      Open Care SuperAdmin
+                    </button>
+                  </li>
+                  <li className="flex items-center justify-between border rounded px-3 py-2">
+                    <div>
+                      <div className="font-medium">Care bundle pricing</div>
+                      <div className="text-xs text-slate-500">
+                        Core + Care bundle currently applies a {PLAN_CONFIG.bundleDiscountPercent}
+                        % discount on the combined monthly price.
+                      </div>
+                    </div>
+                    <button className="px-3 py-1 text-xs rounded border bg-slate-50">
+                      Configure bundles
+                    </button>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          );
+        }
+
+        function StatCard({ label, value }) {
+          return (
+            <div className="bg-white border rounded-lg px-4 py-3">
+              <div className="text-xs text-slate-500">{label}</div>
+              <div className="text-xl font-semibold mt-1">{value}</div>
+            </div>
+          );
+        }
+
+        function MainContent() {
+          if (activeTab === "Dashboard") return <DashboardTab />;
+          if (activeTab === "Pending Onboarding") return <PendingTab />;
+          if (activeTab === "Clinics") return <ClinicsTab />;
+          if (activeTab === "Transactions") return <TransactionsTab />;
+          if (activeTab === "Subscriptions") return <SubscriptionsTab />;
+          if (activeTab === "Promos") return <PromosTab />;
+          if (activeTab === "Audit") return <AuditTab />;
+          if (activeTab === "Notifications") return <NotificationsTab />;
+          if (activeTab === "Site Content") return <SiteContentTab />;
+          if (activeTab === "API Logs") return <ApiLogsTab />;
+          if (activeTab === "Settings") return <SettingsTab />;
+          return <DashboardTab />;
+        }
+
+        return (
+          <div className="min-h-screen flex">
+            <aside className="w-60 shrink-0 bg-white border-r flex flex-col">
+              <div className="px-4 py-3 border-b">
+                <div className="text-xs font-semibold text-emerald-700">HURE</div>
+                <div className="text-sm font-semibold">SuperAdmin</div>
+                <div className="text-[11px] text-slate-500">Core + Care · Microsaas demo</div>
+              </div>
+              <nav className="flex-1 px-2 py-3 text-sm space-y-1">
+                {[
+                  "Dashboard",
+                  "Pending Onboarding",
+                  "Clinics",
+                  "Transactions",
+                  "Subscriptions",
+                  "Promos",
+                  "Audit",
+                  "Notifications",
+                  "Site Content",
+                  "API Logs",
+                  "Settings"
+                ].map(tab => (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    className={
+                      "w-full text-left px-3 py-2 rounded-md mb-1 " +
+                      (activeTab === tab
+                        ? "bg-emerald-50 text-emerald-800 border border-emerald-100"
+                        : "text-slate-700 hover:bg-slate-50")
+                    }
+                  >
+                    {tab}
+                  </button>
+                ))}
+              </nav>
+              <div className="px-4 py-3 border-t text-[11px] text-slate-500">
+                Demo only · Data stored in localStorage.
+              </div>
+            </aside>
+            <main className="flex-1 p-4 md:p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h1 className="text-lg font-semibold">{activeTab}</h1>
+                  <div className="text-xs text-slate-500">
+                    This view is for HURE internal SuperAdmin only — clinics never see this.
+                  </div>
+                </div>
+              </div>
+              <MainContent />
+            </main>
+          </div>
+        );
+      }
+
+      const rootEl = document.getElementById("root");
+      const root = ReactDOM.createRoot(rootEl);
+      root.render(<HureSuperadminApp />);
+    </script>
+  </body>
+</html>
