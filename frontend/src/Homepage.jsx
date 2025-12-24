@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 
 /**
  * Homepage Component
@@ -7,6 +7,8 @@ import React from 'react';
  * 2. Get Started -> Clinic Onboarding
  */
 export default function Homepage() {
+    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
     const handleGetStarted = () => {
         window.location.href = '/onboard';
     };
@@ -26,15 +28,31 @@ export default function Homepage() {
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-900 via-emerald-900 to-slate-900">
             {/* Navigation */}
-            <nav className="absolute top-0 left-0 right-0 z-10">
-                <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
+            <nav className="fixed top-0 left-0 right-0 z-50 bg-slate-900/80 backdrop-blur-sm">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex justify-between items-center">
                     <div className="flex items-center gap-2">
                         <div className="w-10 h-10 bg-emerald-500 rounded-lg flex items-center justify-center">
                             <span className="text-white font-bold text-xl">H</span>
                         </div>
-                        <span className="text-white font-bold text-2xl tracking-tight">HURE</span>
+                        <span className="text-white font-bold text-xl sm:text-2xl tracking-tight">HURE</span>
                     </div>
-                    <div className="flex items-center gap-4">
+
+                    {/* Mobile Menu Button */}
+                    <button
+                        onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                        className="md:hidden p-2 text-white hover:bg-white/10 rounded-lg"
+                    >
+                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            {mobileMenuOpen ? (
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            ) : (
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                            )}
+                        </svg>
+                    </button>
+
+                    {/* Desktop Navigation */}
+                    <div className="hidden md:flex items-center gap-4">
                         <button
                             onClick={handleEmployeeLogin}
                             className="text-slate-300 hover:text-white transition text-sm font-medium"
@@ -55,10 +73,34 @@ export default function Homepage() {
                         </button>
                     </div>
                 </div>
+
+                {/* Mobile Navigation Menu */}
+                {mobileMenuOpen && (
+                    <div className="md:hidden absolute top-full left-0 right-0 bg-slate-900 border-t border-slate-700/50 px-4 py-4 space-y-3 shadow-xl z-50">
+                        <button
+                            onClick={handleEmployeeLogin}
+                            className="block w-full text-left text-slate-300 hover:text-white transition text-sm font-medium py-3 px-2 hover:bg-slate-800 rounded"
+                        >
+                            Staff Login
+                        </button>
+                        <button
+                            onClick={handleEmployerLogin}
+                            className="block w-full text-left text-slate-300 hover:text-white transition text-sm font-medium py-3 px-2 hover:bg-slate-800 rounded"
+                        >
+                            Employer Login
+                        </button>
+                        <button
+                            onClick={handleSuperAdminLogin}
+                            className="block w-full text-center px-4 py-3 bg-slate-800 text-emerald-400 rounded-lg text-sm font-medium hover:bg-slate-700 transition border border-emerald-500/30"
+                        >
+                            SuperAdmin
+                        </button>
+                    </div>
+                )}
             </nav>
 
             {/* Hero Section */}
-            <div className="min-h-screen flex items-center justify-center px-6">
+            <div className="min-h-screen flex items-center justify-center px-4 sm:px-6 pt-24 sm:pt-20">
                 <div className="max-w-4xl mx-auto text-center">
                     {/* Glowing orb effect */}
                     <div className="absolute inset-0 overflow-hidden pointer-events-none">
@@ -66,24 +108,24 @@ export default function Homepage() {
                     </div>
 
                     <div className="relative z-10">
-                        {/* Badge */}
-                        <div className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-full text-emerald-400 text-sm mb-8">
+                        {/* Badge - hidden on very small screens to avoid collision */}
+                        <div className="hidden sm:inline-flex items-center gap-2 px-4 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-full text-emerald-400 text-xs sm:text-sm mb-6 sm:mb-8">
                             <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
                             Multi-Tenant Staff Management Platform
                         </div>
 
                         {/* Headline */}
-                        <h1 className="text-5xl md:text-7xl font-bold text-white mb-6 leading-tight">
+                        <h1 className="text-4xl sm:text-5xl md:text-7xl font-bold text-white mb-4 sm:mb-6 leading-tight">
                             <span className="block bg-gradient-to-r from-emerald-400 to-teal-300 bg-clip-text text-transparent">
                                 Hure Core
                             </span>
-                            <span className="block text-3xl md:text-4xl mt-2 text-slate-300 font-medium">
+                            <span className="block text-xl sm:text-3xl md:text-4xl mt-2 text-slate-300 font-medium">
                                 Multi-Tenant Staff Management
                             </span>
                         </h1>
 
                         {/* Subheadline */}
-                        <p className="text-xl text-slate-400 mb-12 max-w-2xl mx-auto leading-relaxed">
+                        <p className="text-base sm:text-xl text-slate-400 mb-8 sm:mb-12 max-w-2xl mx-auto leading-relaxed px-2">
                             HURE Core streamlines staff management, scheduling, attendance tracking,
                             and compliance for organizations of all sizes.
                         </p>

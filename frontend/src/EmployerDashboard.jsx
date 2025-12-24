@@ -83,6 +83,7 @@ export default function EmployerDashboard() {
     const [showShiftModal, setShowShiftModal] = useState(false);
     const [showKycModal, setShowKycModal] = useState(false);
     const [selectedStaff, setSelectedStaff] = useState(null);
+    const [sidebarOpen, setSidebarOpen] = useState(false);
 
     // Form states
     const [newStaff, setNewStaff] = useState({
@@ -332,8 +333,35 @@ export default function EmployerDashboard() {
     return (
         <div className="min-h-screen bg-gray-50 text-gray-800">
             <div className="flex">
+                {/* Mobile Menu Button */}
+                <button
+                    onClick={() => setSidebarOpen(!sidebarOpen)}
+                    className="lg:hidden fixed top-4 left-4 z-50 p-2 bg-white rounded-md shadow-md border"
+                >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        {sidebarOpen ? (
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        ) : (
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                        )}
+                    </svg>
+                </button>
+
+                {/* Sidebar Overlay for Mobile */}
+                {sidebarOpen && (
+                    <div
+                        className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-30"
+                        onClick={() => setSidebarOpen(false)}
+                    />
+                )}
+
                 {/* Sidebar */}
-                <aside className="w-64 bg-white border-r border-gray-200 min-h-screen sticky top-0 flex flex-col">
+                <aside className={`
+                    fixed lg:sticky top-0 left-0 z-40
+                    w-64 bg-white border-r border-gray-200 min-h-screen flex flex-col
+                    transform transition-transform duration-300 ease-in-out
+                    ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+                `}>
                     <div className="p-4 border-b">
                         <div className="flex items-center gap-3">
                             <div className="h-10 w-10 rounded-full bg-emerald-600 flex items-center justify-center text-white font-semibold">
@@ -430,23 +458,23 @@ export default function EmployerDashboard() {
                 </aside>
 
                 {/* Main Content */}
-                <main className="flex-1 p-8">
+                <main className="flex-1 p-4 lg:p-8 lg:ml-0 pt-16 lg:pt-8">
                     {/* Header */}
-                    <header className="flex items-center justify-between mb-6">
+                    <header className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
                         <div>
-                            <h1 className="text-2xl font-semibold">
+                            <h1 className="text-xl lg:text-2xl font-semibold">
                                 {view === 'dashboard' ? 'Dashboard' : view.charAt(0).toUpperCase() + view.slice(1)}
                             </h1>
-                            <p className="text-sm text-gray-500 mt-1">
+                            <p className="text-xs lg:text-sm text-gray-500 mt-1 hidden sm:block">
                                 Manage your clinic staff, schedules, and operations
                             </p>
                         </div>
-                        <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-3">
                             <div className="text-right">
                                 <div className="text-sm font-medium">{clinicSettings.clinic.name || clinicInfo.name}</div>
                                 <div className="text-xs text-gray-500">{clinicSettings.clinic.town || clinicInfo.town}</div>
                             </div>
-                            <div className="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 font-medium">
+                            <div className="h-8 w-8 lg:h-10 lg:w-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 font-medium text-sm">
                                 {(clinicSettings.clinic.name || clinicInfo.name || 'C').charAt(0).toUpperCase()}
                             </div>
                         </div>

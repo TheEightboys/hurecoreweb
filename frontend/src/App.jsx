@@ -29,6 +29,7 @@ export default function HureSuperadminApp() {
     const [auditFilterType, setAuditFilterType] = useState('all');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
+    const [sidebarOpen, setSidebarOpen] = useState(false);
 
     // Fetch data on mount
     useEffect(() => {
@@ -745,14 +746,41 @@ export default function HureSuperadminApp() {
     // Main layout
     return (
         <div className="min-h-screen flex bg-slate-100">
+            {/* Mobile Menu Button */}
+            <button
+                onClick={() => setSidebarOpen(!sidebarOpen)}
+                className="lg:hidden fixed top-4 left-4 z-50 p-2 bg-white rounded-md shadow-md border"
+            >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    {sidebarOpen ? (
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    ) : (
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                    )}
+                </svg>
+            </button>
+
+            {/* Sidebar Overlay for Mobile */}
+            {sidebarOpen && (
+                <div
+                    className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-30"
+                    onClick={() => setSidebarOpen(false)}
+                />
+            )}
+
             {/* Sidebar */}
-            <aside className="w-60 shrink-0 bg-white border-r flex flex-col">
+            <aside className={`
+                fixed lg:sticky top-0 left-0 z-40
+                w-60 shrink-0 bg-white border-r flex flex-col min-h-screen
+                transform transition-transform duration-300 ease-in-out
+                ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+            `}>
                 <div className="px-4 py-3 border-b">
                     <div className="text-xs font-semibold text-emerald-700">HURE</div>
                     <div className="text-sm font-semibold">SuperAdmin</div>
                     <div className="text-xs text-slate-500">Core + Care</div>
                 </div>
-                <nav className="flex-1 px-2 py-3 text-sm space-y-1">
+                <nav className="flex-1 px-2 py-3 text-sm space-y-1 overflow-y-auto">
                     {[
                         'Dashboard',
                         'Pending Onboarding',
@@ -766,7 +794,7 @@ export default function HureSuperadminApp() {
                     ].map(tab => (
                         <button
                             key={tab}
-                            onClick={() => setActiveTab(tab)}
+                            onClick={() => { setActiveTab(tab); setSidebarOpen(false); }}
                             className={`w-full text-left px-3 py-2 rounded-md mb-1 ${activeTab === tab
                                 ? 'bg-emerald-50 text-emerald-800 border border-emerald-100'
                                 : 'text-slate-700 hover:bg-slate-50'
@@ -777,15 +805,18 @@ export default function HureSuperadminApp() {
                     ))}
                 </nav>
                 <div className="px-4 py-3 border-t text-xs text-slate-500">
-                    <button onClick={() => { api.logout(); setIsAuthenticated(false); }}>
+                    <button
+                        onClick={() => { api.logout(); setIsAuthenticated(false); window.location.href = '/'; }}
+                        className="text-red-600 hover:text-red-800"
+                    >
                         Logout
                     </button>
                 </div>
             </aside>
 
             {/* Main */}
-            <main className="flex-1 p-4 md:p-6">
-                <div className="flex items-center justify-between mb-4">
+            <main className="flex-1 p-4 lg:p-6 pt-16 lg:pt-6">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-2">
                     <div>
                         <h1 className="text-lg font-semibold">{activeTab}</h1>
                         <div className="text-xs text-slate-500">

@@ -17,6 +17,7 @@ export default function EmployeeDashboard() {
     // Modals
     const [showLeaveModal, setShowLeaveModal] = useState(false);
     const [showEditProfile, setShowEditProfile] = useState(false);
+    const [sidebarOpen, setSidebarOpen] = useState(false);
 
     const todayISO = new Date().toISOString().slice(0, 10);
 
@@ -234,8 +235,35 @@ export default function EmployeeDashboard() {
     return (
         <div className="min-h-screen bg-gray-50 text-gray-800">
             <div className="flex">
+                {/* Mobile Menu Button */}
+                <button
+                    onClick={() => setSidebarOpen(!sidebarOpen)}
+                    className="lg:hidden fixed top-4 left-4 z-50 p-2 bg-white rounded-md shadow-md border"
+                >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        {sidebarOpen ? (
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        ) : (
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                        )}
+                    </svg>
+                </button>
+
+                {/* Sidebar Overlay for Mobile */}
+                {sidebarOpen && (
+                    <div
+                        className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-30"
+                        onClick={() => setSidebarOpen(false)}
+                    />
+                )}
+
                 {/* Sidebar */}
-                <aside className="w-72 bg-white border-r border-gray-200 min-h-screen sticky top-0 flex flex-col">
+                <aside className={`
+                    fixed lg:sticky top-0 left-0 z-40
+                    w-64 lg:w-72 bg-white border-r border-gray-200 min-h-screen flex flex-col
+                    transform transition-transform duration-300 ease-in-out
+                    ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+                `}>
                     <div className="p-4 border-b">
                         <div className="flex items-center gap-3">
                             <div className="h-10 w-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-semibold">
@@ -317,20 +345,20 @@ export default function EmployeeDashboard() {
                 </aside>
 
                 {/* Main Content */}
-                <main className="flex-1 p-8">
-                    <header className="flex items-center justify-between mb-6">
+                <main className="flex-1 p-4 lg:p-8 pt-16 lg:pt-8">
+                    <header className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
                         <div>
-                            <h1 className="text-2xl font-semibold">{viewTitle}</h1>
-                            <p className="text-sm text-gray-500 mt-1">
+                            <h1 className="text-xl lg:text-2xl font-semibold">{viewTitle}</h1>
+                            <p className="text-xs lg:text-sm text-gray-500 mt-1">
                                 {profile?.clinic_name} · {profile?.location_name}
                             </p>
                         </div>
-                        <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-3">
                             <div className="text-right">
                                 <div className="text-sm font-medium">{profile?.role}</div>
                                 <div className="text-xs text-gray-500">Employee</div>
                             </div>
-                            <div className="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center">
+                            <div className="h-8 w-8 lg:h-10 lg:w-10 rounded-full bg-gray-200 flex items-center justify-center text-sm">
                                 {profile?.first_name?.[0] || 'U'}
                             </div>
                         </div>
@@ -764,8 +792,8 @@ function LeaveView({ leaves, showModal, setShowModal, onSubmit }) {
                                 {l.reason && <div className="text-xs mt-1">{l.reason}</div>}
                             </div>
                             <span className={`px-2 py-1 rounded-full text-xs font-medium capitalize ${l.status === 'approved' ? 'bg-green-100 text-green-700' :
-                                    l.status === 'rejected' ? 'bg-red-100 text-red-700' :
-                                        'bg-yellow-100 text-yellow-700'
+                                l.status === 'rejected' ? 'bg-red-100 text-red-700' :
+                                    'bg-yellow-100 text-yellow-700'
                                 }`}>
                                 {l.status}
                             </span>
