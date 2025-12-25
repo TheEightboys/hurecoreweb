@@ -69,8 +69,87 @@ export default function EmployeeDashboard() {
         }
     }
 
-    // Computed values
-    const fullName = profile ? `${profile.first_name} ${profile.last_name}` : '';
+    // ============================================
+    // HELPER FUNCTIONS
+    // ============================================
+
+    // Title case helper for proper name formatting
+    function toTitleCase(str) {
+        if (!str) return '';
+        return str.toLowerCase().split(' ')
+            .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+            .join(' ');
+    }
+
+    // Human-readable date format with weekday (e.g., "Wed, 24 Dec 2025")
+    function formatDateWithDay(dateStr) {
+        if (!dateStr) return '';
+        const date = new Date(dateStr + 'T00:00:00');
+        return date.toLocaleDateString('en-GB', {
+            weekday: 'short',
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric'
+        });
+    }
+
+    // Short date format (e.g., "24 Dec 2025")
+    function formatDate(dateStr) {
+        if (!dateStr) return '';
+        const date = new Date(dateStr + 'T00:00:00');
+        return date.toLocaleDateString('en-GB', {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric'
+        });
+    }
+
+    // Format time for display (e.g., "18:21")
+    function formatShiftTime(timeStr) {
+        if (!timeStr) return '';
+        // Handle full timestamp or time-only string
+        if (timeStr.includes('T')) {
+            return new Date(timeStr).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+        }
+        return timeStr.slice(0, 5); // HH:MM from HH:MM:SS
+    }
+
+    // Format time range (e.g., "18:21 – 18:47")
+    function formatTimeRange(startTime, endTime) {
+        return `${formatShiftTime(startTime)} – ${formatShiftTime(endTime)}`;
+    }
+
+    // Employee-facing status labels for ASSIGNED shifts (not available)
+    function getEmployeeShiftStatus(status) {
+        switch (status?.toLowerCase()) {
+            case 'open': return 'Available'; // This shouldn't show in "Your Shifts"
+            case 'assigned': return 'Scheduled';
+            case 'confirmed': return 'Confirmed';
+            case 'declined': return 'Declined';
+            case 'completed': return 'Completed';
+            default: return 'Scheduled';
+        }
+    }
+
+    // Check if a shift is an "available" shift (not yet assigned to this employee)
+    function isAvailableShift(shift) {
+        return shift.isOpenShift || shift.status?.toLowerCase() === 'open';
+    }
+
+    // Clean location string (remove trailing dots, proper formatting)
+    function cleanLocation(str) {
+        if (!str) return '';
+        return str.replace(/\s*\.\s*$/, '').trim();
+    }
+
+    // ============================================
+    // COMPUTED VALUES
+    // ============================================
+
+    const fullName = profile ? toTitleCase(`${profile.first_name} ${profile.last_name}`) : '';
+    const clinicName = profile?.clinic_name ? toTitleCase(cleanLocation(profile.clinic_name)) : '';
+    const locationName = profile?.location_name ? toTitleCase(cleanLocation(profile.location_name)) : '';
+
     const nextShift = useMemo(() =>
         schedule
             .filter(s => s.date >= todayISO && s.status !== 'Declined')
@@ -191,11 +270,12 @@ export default function EmployeeDashboard() {
     }
 
     const viewTitle = {
-        dashboard: `Hi, ${fullName}`,
+        dashboard: `Hi ${fullName}`,
         schedule: 'My Schedule',
         attendance: 'My Attendance',
         leave: 'My Leave',
         docs: 'Docs & Policies',
+        compliance: 'My Compliance Docs',
         profile: 'My Profile'
     }[view] || 'Employee Portal';
 
@@ -277,41 +357,75 @@ export default function EmployeeDashboard() {
                     </div>
 
                     <nav className="p-4 space-y-1 text-sm flex-1">
-                        <div className="text-xs text-gray-400 uppercase mb-2">Menu</div>
+                        {/* Work Section */}
+                        <div className="text-xs text-gray-400 uppercase tracking-wider mb-2">Work</div>
                         <button
                             onClick={() => setView('dashboard')}
-                            className={`block w-full text-left px-3 py-2 rounded-md ${view === 'dashboard' ? 'bg-blue-50 text-blue-700' : 'hover:bg-gray-100'}`}
+                            className={`flex items-center gap-3 w-full text-left px-3 py-2.5 rounded-md transition-colors ${view === 'dashboard' ? 'bg-blue-100 text-blue-800 font-medium' : 'hover:bg-gray-100'}`}
                         >
-                            My Dashboard
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                            </svg>
+                            Home
                         </button>
                         <button
                             onClick={() => setView('schedule')}
-                            className={`block w-full text-left px-3 py-2 rounded-md ${view === 'schedule' ? 'bg-blue-50 text-blue-700' : 'hover:bg-gray-100'}`}
+                            className={`flex items-center gap-3 w-full text-left px-3 py-2.5 rounded-md transition-colors ${view === 'schedule' ? 'bg-blue-100 text-blue-800 font-medium' : 'hover:bg-gray-100'}`}
                         >
-                            My Schedule
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                            Schedule
                         </button>
                         <button
                             onClick={() => setView('attendance')}
-                            className={`block w-full text-left px-3 py-2 rounded-md ${view === 'attendance' ? 'bg-blue-50 text-blue-700' : 'hover:bg-gray-100'}`}
+                            className={`flex items-center gap-3 w-full text-left px-3 py-2.5 rounded-md transition-colors ${view === 'attendance' ? 'bg-blue-100 text-blue-800 font-medium' : 'hover:bg-gray-100'}`}
                         >
-                            My Attendance
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            Attendance
                         </button>
                         <button
                             onClick={() => setView('leave')}
-                            className={`block w-full text-left px-3 py-2 rounded-md ${view === 'leave' ? 'bg-blue-50 text-blue-700' : 'hover:bg-gray-100'}`}
+                            className={`flex items-center gap-3 w-full text-left px-3 py-2.5 rounded-md transition-colors ${view === 'leave' ? 'bg-blue-100 text-blue-800 font-medium' : 'hover:bg-gray-100'}`}
                         >
-                            My Leave
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                            </svg>
+                            Leave
                         </button>
+
+                        {/* Documents Section */}
+                        <div className="text-xs text-gray-400 uppercase tracking-wider mt-4 mb-2">Documents</div>
                         <button
                             onClick={() => setView('docs')}
-                            className={`block w-full text-left px-3 py-2 rounded-md ${view === 'docs' ? 'bg-blue-50 text-blue-700' : 'hover:bg-gray-100'}`}
+                            className={`flex items-center gap-3 w-full text-left px-3 py-2.5 rounded-md transition-colors ${view === 'docs' ? 'bg-blue-100 text-blue-800 font-medium' : 'hover:bg-gray-100'}`}
                         >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
                             Docs & Policies
                         </button>
                         <button
-                            onClick={() => setView('profile')}
-                            className={`block w-full text-left px-3 py-2 rounded-md ${view === 'profile' ? 'bg-blue-50 text-blue-700' : 'hover:bg-gray-100'}`}
+                            onClick={() => setView('compliance')}
+                            className={`flex items-center gap-3 w-full text-left px-3 py-2.5 rounded-md transition-colors ${view === 'compliance' ? 'bg-blue-100 text-blue-800 font-medium' : 'hover:bg-gray-100'}`}
                         >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                            </svg>
+                            My Compliance Docs
+                        </button>
+
+                        {/* Account Section */}
+                        <div className="text-xs text-gray-400 uppercase tracking-wider mt-4 mb-2">Account</div>
+                        <button
+                            onClick={() => setView('profile')}
+                            className={`flex items-center gap-3 w-full text-left px-3 py-2.5 rounded-md transition-colors ${view === 'profile' ? 'bg-blue-100 text-blue-800 font-medium' : 'hover:bg-gray-100'}`}
+                        >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                            </svg>
                             Profile
                         </button>
                     </nav>
@@ -350,16 +464,15 @@ export default function EmployeeDashboard() {
                         <div>
                             <h1 className="text-xl lg:text-2xl font-semibold">{viewTitle}</h1>
                             <p className="text-xs lg:text-sm text-gray-500 mt-1">
-                                {profile?.clinic_name} · {profile?.location_name}
+                                {clinicName}{locationName ? ` · ${locationName}` : ''}
                             </p>
                         </div>
                         <div className="flex items-center gap-3">
                             <div className="text-right">
                                 <div className="text-sm font-medium">{profile?.role}</div>
-                                <div className="text-xs text-gray-500">Employee</div>
                             </div>
-                            <div className="h-8 w-8 lg:h-10 lg:w-10 rounded-full bg-gray-200 flex items-center justify-center text-sm">
-                                {profile?.first_name?.[0] || 'U'}
+                            <div className="h-8 w-8 lg:h-10 lg:w-10 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-sm font-medium">
+                                {profile?.first_name?.[0]?.toUpperCase() || 'U'}
                             </div>
                         </div>
                     </header>
@@ -368,59 +481,72 @@ export default function EmployeeDashboard() {
                     {view === 'dashboard' && (
                         <div>
                             {needsReminder && (
-                                <div className="mb-4 p-3 rounded-md bg-amber-50 border border-amber-200 text-sm text-amber-900 flex items-center justify-between">
-                                    <div>
-                                        <div className="font-medium">Action needed</div>
-                                        <div className="text-xs">
-                                            {licenseExpired && 'License expired · '}
-                                            {licenseExpiringSoon && `License expiring in ${licenseDays} days · `}
-                                            {profile?.kyc_status !== 'verified' && `Verification status: ${profile?.kyc_status}`}
+                                <div className="mb-4 p-4 rounded-lg bg-amber-50 border-l-4 border-amber-500">
+                                    <div className="flex items-start justify-between gap-4">
+                                        <div>
+                                            <div className="font-semibold text-amber-900 text-base">Action needed</div>
+                                            <div className="text-sm text-amber-800 mt-1">
+                                                {licenseExpired && 'Your license has expired'}
+                                                {licenseExpiringSoon && !licenseExpired && `License expires in ${licenseDays} day${licenseDays !== 1 ? 's' : ''}`}
+                                                {profile?.kyc_status !== 'verified' && !licenseExpired && !licenseExpiringSoon && 'Verification pending'}
+                                                {profile?.kyc_status !== 'verified' && (licenseExpired || licenseExpiringSoon) && ' · Verification pending'}
+                                            </div>
                                         </div>
+                                        <button
+                                            onClick={() => setView('profile')}
+                                            className="px-4 py-2 rounded-md bg-amber-600 text-white text-sm font-medium hover:bg-amber-700 whitespace-nowrap"
+                                        >
+                                            {licenseExpired || licenseExpiringSoon ? 'Update license' : 'Complete verification'}
+                                        </button>
                                     </div>
-                                    <button
-                                        onClick={() => setView('profile')}
-                                        className="px-3 py-1 rounded-md bg-amber-600 text-white text-xs"
-                                    >
-                                        Update now
-                                    </button>
                                 </div>
                             )}
 
-                            <section className="grid grid-cols-4 gap-4 mb-6">
+                            <section className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                                 <div className="bg-white p-4 rounded-lg shadow-sm border">
-                                    <div className="text-xs text-gray-400">Employment Status</div>
-                                    <div className="mt-2 text-sm font-medium capitalize">
+                                    <div className="text-xs text-gray-400 uppercase tracking-wide">Status</div>
+                                    <div className="mt-2 text-sm font-semibold capitalize text-green-600">
                                         {profile?.employment_status || '—'}
                                     </div>
                                 </div>
                                 <div className="bg-white p-4 rounded-lg shadow-sm border">
-                                    <div className="text-xs text-gray-400">Verification</div>
-                                    <div className="mt-2 text-sm font-medium capitalize">
+                                    <div className="text-xs text-gray-400 uppercase tracking-wide">Verification</div>
+                                    <div className={`mt-2 text-sm font-semibold capitalize ${profile?.kyc_status === 'verified' ? 'text-green-600' : 'text-amber-600'}`}>
                                         {profile?.kyc_status?.replace(/_/g, ' ') || '—'}
                                     </div>
                                 </div>
                                 <div className="bg-white p-4 rounded-lg shadow-sm border">
-                                    <div className="text-xs text-gray-400">License</div>
-                                    <div className="mt-2 text-sm">{profile?.license_type || '—'}</div>
-                                    <div className="text-xs text-gray-500">{profile?.license_number || '—'}</div>
+                                    <div className="text-xs text-gray-400 uppercase tracking-wide">License</div>
+                                    <div className="mt-2 text-sm font-medium">{profile?.license_type || '—'}</div>
+                                    <div className="text-xs text-gray-500">{profile?.license_number || ''}</div>
                                 </div>
                                 <div className="bg-white p-4 rounded-lg shadow-sm border">
-                                    <div className="text-xs text-gray-400">License Expiry</div>
-                                    <div className={`mt-2 text-sm ${licenseExpired ? 'text-red-600' : licenseExpiringSoon ? 'text-amber-600' : ''}`}>
-                                        {profile?.license_expiry || '—'}
-                                    </div>
-                                    {licenseExpired && <div className="text-xs text-red-600">Expired</div>}
-                                    {licenseExpiringSoon && <div className="text-xs text-amber-600">{licenseDays} days left</div>}
+                                    <div className="text-xs text-gray-400 uppercase tracking-wide">License Expiry</div>
+                                    {licenseExpired ? (
+                                        <div className="mt-2">
+                                            <div className="text-sm font-bold text-red-600">Expired</div>
+                                            <div className="text-xs text-gray-500">{formatDate(profile?.license_expiry)}</div>
+                                        </div>
+                                    ) : licenseExpiringSoon ? (
+                                        <div className="mt-2">
+                                            <div className="text-sm font-bold text-amber-600">{licenseDays} day{licenseDays !== 1 ? 's' : ''} left</div>
+                                            <div className="text-xs text-gray-500">{formatDate(profile?.license_expiry)}</div>
+                                        </div>
+                                    ) : (
+                                        <div className="mt-2 text-sm font-medium text-green-600">
+                                            {profile?.license_expiry ? formatDate(profile.license_expiry) : '—'}
+                                        </div>
+                                    )}
                                 </div>
                             </section>
 
-                            <div className="grid grid-cols-3 gap-6">
-                                <div className="col-span-2 bg-white p-4 rounded-lg shadow-sm border">
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                <div className="lg:col-span-2 bg-white p-4 rounded-lg shadow-sm border">
                                     <div className="flex items-center justify-between mb-3">
                                         <h2 className="text-lg font-semibold">Upcoming Shifts</h2>
                                         {nextShift && (
-                                            <div className="text-xs text-gray-500">
-                                                Next: {nextShift.date} {nextShift.start_time}–{nextShift.end_time}
+                                            <div className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                                                Next: {formatDate(nextShift.date)}
                                             </div>
                                         )}
                                     </div>
@@ -429,11 +555,13 @@ export default function EmployeeDashboard() {
                                             <div key={s.id} className="flex items-center justify-between p-3 rounded-md bg-gray-50 border">
                                                 <div>
                                                     <div className="text-sm font-medium">
-                                                        {s.date} · {s.start_time}–{s.end_time} · {s.role}
+                                                        {formatDate(s.date)} • {formatShiftTime(s.start_time)} – {formatShiftTime(s.end_time)}
                                                     </div>
-                                                    <div className="text-xs text-gray-500 capitalize">{s.status}</div>
+                                                    <div className="text-xs text-gray-600 mt-0.5">
+                                                        {s.role} • <span className={`${s.status === 'confirmed' ? 'text-green-600' : s.status === 'declined' ? 'text-red-600' : 'text-blue-600'}`}>{getEmployeeShiftStatus(s.status)}</span>
+                                                    </div>
                                                     {s.decline_reason && (
-                                                        <div className="text-xs text-red-500">Declined: {s.decline_reason}</div>
+                                                        <div className="text-xs text-red-500 mt-1">Reason: {s.decline_reason}</div>
                                                     )}
                                                 </div>
                                                 <div className="flex gap-2">
@@ -441,13 +569,13 @@ export default function EmployeeDashboard() {
                                                         <>
                                                             <button
                                                                 onClick={() => confirmShift(s.id)}
-                                                                className="text-xs border rounded px-2 py-1 hover:bg-gray-100"
+                                                                className="text-xs border border-green-200 bg-green-50 text-green-700 rounded px-3 py-1.5 hover:bg-green-100"
                                                             >
                                                                 Confirm
                                                             </button>
                                                             <button
                                                                 onClick={() => declineShift(s.id)}
-                                                                className="text-xs border rounded px-2 py-1 text-red-600 hover:bg-red-50"
+                                                                className="text-xs border border-red-200 bg-red-50 text-red-600 rounded px-3 py-1.5 hover:bg-red-100"
                                                             >
                                                                 Decline
                                                             </button>
@@ -457,7 +585,7 @@ export default function EmployeeDashboard() {
                                             </div>
                                         ))}
                                         {schedule.filter(s => s.date >= todayISO).length === 0 && (
-                                            <p className="text-gray-500 text-sm">No upcoming shifts</p>
+                                            <p className="text-gray-500 text-sm py-4 text-center">No upcoming shifts scheduled</p>
                                         )}
                                     </div>
                                 </div>
@@ -465,36 +593,54 @@ export default function EmployeeDashboard() {
                                 <div className="bg-white p-4 rounded-lg shadow-sm border">
                                     <h3 className="text-lg font-semibold mb-3">Quick Actions</h3>
                                     <div className="space-y-2">
-                                        <button
-                                            onClick={activePunch ? handleClockOut : handleClockIn}
-                                            className="w-full px-3 py-2 rounded-md bg-green-600 text-white text-sm hover:bg-green-700"
-                                        >
-                                            {activePunch ? 'Clock Out' : 'Clock In'}
-                                        </button>
-                                        <div className="text-xs text-gray-500">
-                                            {activePunch
-                                                ? `Clocked in today at ${activePunch.in}`
-                                                : todayShift
-                                                    ? `Scheduled today: ${todayShift.start_time}–${todayShift.end_time}`
-                                                    : 'No active clock-in.'}
-                                        </div>
+                                        {/* Conditional Clock In/Out */}
+                                        {activePunch ? (
+                                            <>
+                                                <button
+                                                    onClick={handleClockOut}
+                                                    className="w-full px-3 py-2.5 rounded-md bg-red-600 text-white text-sm font-medium hover:bg-red-700"
+                                                >
+                                                    Clock Out
+                                                </button>
+                                                <div className="text-xs text-gray-500 text-center">
+                                                    Clocked in at {formatShiftTime(activePunch.in)}
+                                                </div>
+                                            </>
+                                        ) : todayShift ? (
+                                            <>
+                                                <button
+                                                    onClick={handleClockIn}
+                                                    className="w-full px-3 py-2.5 rounded-md bg-green-600 text-white text-sm font-medium hover:bg-green-700"
+                                                >
+                                                    Clock In
+                                                </button>
+                                                <div className="text-xs text-gray-500 text-center">
+                                                    Today: {formatShiftTime(todayShift.start_time)} – {formatShiftTime(todayShift.end_time)}
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <div className="text-center py-3 text-gray-500 text-sm bg-gray-50 rounded-md border border-dashed">
+                                                No shift scheduled today
+                                            </div>
+                                        )}
+
                                         <button
                                             onClick={() => setView('attendance')}
                                             className="w-full px-3 py-2 rounded-md bg-white border text-sm hover:bg-gray-50"
                                         >
-                                            View My Attendance
+                                            View attendance
                                         </button>
                                         <button
                                             onClick={() => setView('leave')}
                                             className="w-full px-3 py-2 rounded-md bg-white border text-sm hover:bg-gray-50"
                                         >
-                                            Request Leave
+                                            Request leave
                                         </button>
                                         <button
                                             onClick={() => setView('profile')}
                                             className="w-full px-3 py-2 rounded-md bg-white border text-sm hover:bg-gray-50"
                                         >
-                                            Update Profile
+                                            Update profile
                                         </button>
                                     </div>
                                 </div>
@@ -504,52 +650,117 @@ export default function EmployeeDashboard() {
 
                     {/* Schedule View */}
                     {view === 'schedule' && (
-                        <div className="bg-white p-4 rounded-lg shadow-sm border">
-                            <div className="flex items-center justify-between mb-3">
-                                <h2 className="text-lg font-semibold">My Schedule</h2>
-                                <div className="text-sm text-gray-500">Assigned & available shifts</div>
-                            </div>
-                            <div className="space-y-3">
-                                {schedule.map(s => (
-                                    <div key={s.id} className={`flex items-center justify-between p-3 rounded-md border ${s.isOpenShift ? 'bg-blue-50 border-blue-200' : 'bg-gray-50'}`}>
-                                        <div>
-                                            <div className="text-sm font-medium">
-                                                {s.date} · {s.start_time}–{s.end_time} · {s.role}
-                                                {s.isOpenShift && (
-                                                    <span className="ml-2 px-2 py-0.5 text-xs bg-blue-100 text-blue-700 rounded-full">
-                                                        Open Shift
-                                                    </span>
-                                                )}
+                        <div className="space-y-6">
+                            {/* Your Scheduled Shifts */}
+                            <div className="bg-white p-4 rounded-lg shadow-sm border">
+                                <div className="flex items-center justify-between mb-4">
+                                    <div>
+                                        <h2 className="text-lg font-semibold">Your Shifts</h2>
+                                        <p className="text-sm text-gray-500">Shifts assigned to you</p>
+                                    </div>
+                                </div>
+                                <div className="space-y-3">
+                                    {schedule.filter(s => !isAvailableShift(s) && s.date >= todayISO).length > 0 ? (
+                                        schedule.filter(s => !isAvailableShift(s) && s.date >= todayISO).map(s => (
+                                            <div key={s.id} className="p-4 rounded-lg border bg-gray-50">
+                                                <div className="flex items-start justify-between">
+                                                    <div className="flex-1">
+                                                        <div className="font-medium text-gray-900">
+                                                            {formatDateWithDay(s.date)}
+                                                        </div>
+                                                        <div className="text-sm text-gray-600 mt-1">
+                                                            {formatTimeRange(s.start_time, s.end_time)}
+                                                        </div>
+                                                        <div className="text-sm text-gray-500 mt-1">
+                                                            {s.role}
+                                                        </div>
+                                                        <div className="text-xs text-gray-400 mt-1">
+                                                            Location: {toTitleCase(cleanLocation(s.location || profile?.location_name || profile?.clinic_name || 'Not specified'))}
+                                                        </div>
+                                                        {s.decline_reason && (
+                                                            <div className="text-xs text-red-500 mt-2">Reason: {s.decline_reason}</div>
+                                                        )}
+                                                    </div>
+                                                    <div className="flex flex-col items-end gap-2">
+                                                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${s.status === 'confirmed' ? 'bg-green-100 text-green-700' :
+                                                            s.status === 'declined' ? 'bg-red-100 text-red-700' :
+                                                                s.status === 'completed' ? 'bg-gray-200 text-gray-700' :
+                                                                    'bg-blue-100 text-blue-700'
+                                                            }`}>
+                                                            {getEmployeeShiftStatus(s.status)}
+                                                        </span>
+                                                        {s.status === 'assigned' && (
+                                                            <div className="flex gap-2 mt-2">
+                                                                <button
+                                                                    onClick={() => confirmShift(s.id)}
+                                                                    className="text-xs border border-green-200 bg-green-50 text-green-700 rounded px-3 py-1.5 hover:bg-green-100"
+                                                                >
+                                                                    Confirm
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => declineShift(s.id)}
+                                                                    className="text-xs border border-red-200 bg-red-50 text-red-600 rounded px-3 py-1.5 hover:bg-red-100"
+                                                                >
+                                                                    Decline
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
                                             </div>
-                                            <div className="text-xs text-gray-500 capitalize">{s.status}</div>
-                                            {s.decline_reason && (
-                                                <div className="text-xs text-red-500">Declined: {s.decline_reason}</div>
+                                        ))
+                                    ) : (
+                                        <div className="text-center py-8">
+                                            <p className="text-gray-500">You have no upcoming shifts scheduled.</p>
+                                            {nextShift && nextShift.date > todayISO && (
+                                                <p className="text-sm text-gray-400 mt-2">
+                                                    Your next shift is on {formatDate(nextShift.date)}.
+                                                </p>
                                             )}
                                         </div>
-                                        <div className="flex gap-2">
-                                            {s.status === 'assigned' && (
-                                                <>
-                                                    <button
-                                                        onClick={() => confirmShift(s.id)}
-                                                        className="text-xs border rounded px-2 py-1 hover:bg-gray-100"
-                                                    >
-                                                        Confirm
-                                                    </button>
-                                                    <button
-                                                        onClick={() => declineShift(s.id)}
-                                                        className="text-xs border rounded px-2 py-1 text-red-600 hover:bg-red-50"
-                                                    >
-                                                        Decline
-                                                    </button>
-                                                </>
-                                            )}
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Available Shifts Section */}
+                            {schedule.filter(s => isAvailableShift(s) && s.date >= todayISO).length > 0 && (
+                                <div className="bg-white p-4 rounded-lg shadow-sm border">
+                                    <div className="flex items-center justify-between mb-4">
+                                        <div>
+                                            <h2 className="text-lg font-semibold">Available Shifts</h2>
+                                            <p className="text-sm text-gray-500">Shifts you can accept</p>
                                         </div>
                                     </div>
-                                ))}
-                                {schedule.length === 0 && (
-                                    <p className="text-gray-500 text-sm">No shifts scheduled</p>
-                                )}
-                            </div>
+                                    <div className="space-y-3">
+                                        {schedule.filter(s => isAvailableShift(s) && s.date >= todayISO).map(s => (
+                                            <div key={s.id} className="p-4 rounded-lg border border-blue-200 bg-blue-50">
+                                                <div className="flex items-start justify-between">
+                                                    <div className="flex-1">
+                                                        <div className="font-medium text-gray-900">
+                                                            {formatDateWithDay(s.date)}
+                                                        </div>
+                                                        <div className="text-sm text-gray-600 mt-1">
+                                                            {formatTimeRange(s.start_time, s.end_time)}
+                                                        </div>
+                                                        <div className="text-sm text-gray-500 mt-1">
+                                                            {s.role}
+                                                        </div>
+                                                        <div className="text-xs text-gray-400 mt-1">
+                                                            Location: {toTitleCase(cleanLocation(s.location || profile?.location_name || profile?.clinic_name || 'Not specified'))}
+                                                        </div>
+                                                    </div>
+                                                    <button
+                                                        onClick={() => confirmShift(s.id)}
+                                                        className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700"
+                                                    >
+                                                        Accept Shift
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
 
@@ -557,11 +768,12 @@ export default function EmployeeDashboard() {
                     {/* Attendance View */}
                     {view === 'attendance' && (
                         <div className="bg-white p-4 rounded-lg shadow-sm border max-w-4xl">
-                            <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center justify-between mb-4">
                                 <div>
                                     <h2 className="text-lg font-semibold">My Attendance</h2>
-                                    <p className="text-xs text-gray-500 mt-1">
-                                        Present (≥8 hrs) | Half Day (≥4 hrs) | Absent (&lt;4 hrs)
+                                    <p className="text-sm text-gray-500">{clinicName || locationName}</p>
+                                    <p className="text-xs text-gray-400 mt-1">
+                                        Present (Full shift) | Half Day | Absent
                                     </p>
                                 </div>
                                 <button
@@ -571,69 +783,39 @@ export default function EmployeeDashboard() {
                                     Export CSV
                                 </button>
                             </div>
-                            <table className="w-full text-sm">
-                                <thead>
-                                    <tr className="text-left text-xs text-gray-500 border-b">
-                                        <th className="py-2">Date</th>
-                                        <th className="py-2">Clock In</th>
-                                        <th className="py-2">Clock Out</th>
-                                        <th className="py-2">Hours Worked</th>
-                                        <th className="py-2">Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {attendance.slice().reverse().map(a => {
-                                        // Format timestamps to readable time
-                                        const formatTime = (timestamp) => {
-                                            if (!timestamp) return '—';
-                                            const date = new Date(timestamp);
-                                            return date.toLocaleTimeString('en-US', {
-                                                hour: '2-digit',
-                                                minute: '2-digit',
-                                                hour12: true
-                                            });
-                                        };
 
-                                        // Calculate overtime
-                                        const hoursWorked = a.hours_worked || 0;
-                                        const overtime = hoursWorked > 8 ? hoursWorked - 8 : 0;
+                            {attendance.length > 0 ? (
+                                <table className="w-full text-sm">
+                                    <thead>
+                                        <tr className="text-left text-xs text-gray-500 border-b">
+                                            <th className="py-2">Date</th>
+                                            <th className="py-2">Clock In</th>
+                                            <th className="py-2">Clock Out</th>
+                                            <th className="py-2">Hours Worked</th>
+                                            <th className="py-2">Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {attendance.slice().reverse().map(a => {
+                                            // Format timestamps to readable time
+                                            const formatTimeStamp = (timestamp) => {
+                                                if (!timestamp) return '—';
+                                                const date = new Date(timestamp);
+                                                return date.toLocaleTimeString('en-US', {
+                                                    hour: '2-digit',
+                                                    minute: '2-digit',
+                                                    hour12: true
+                                                });
+                                            };
 
-                                        // Status badge colors
-                                        const getStatusBadge = (status) => {
-                                            switch (status) {
-                                                case 'present':
-                                                    return 'bg-green-100 text-green-700';
-                                                case 'half_day':
-                                                    return 'bg-yellow-100 text-yellow-700';
-                                                case 'absent':
-                                                    return 'bg-red-100 text-red-700';
-                                                default:
-                                                    return 'bg-blue-100 text-blue-700';
-                                            }
-                                        };
+                                            // Calculate hours worked
+                                            const hoursWorked = a.hours_worked || 0;
+                                            const overtime = hoursWorked > 8 ? hoursWorked - 8 : 0;
 
-                                        const getStatusLabel = (status) => {
-                                            switch (status) {
-                                                case 'present': return 'Present';
-                                                case 'half_day': return 'Half Day';
-                                                case 'absent': return 'Absent';
-                                                default: return 'Clocked In';
-                                            }
-                                        };
-
-                                        return (
-                                            <tr key={a.id} className="border-b">
-                                                <td className="py-2">{a.date}</td>
-                                                <td className="py-2 text-green-600 font-medium">
-                                                    {formatTime(a.clock_in)}
-                                                </td>
-                                                <td className="py-2 text-red-600 font-medium">
-                                                    {a.clock_out ? formatTime(a.clock_out) : (
-                                                        <span className="text-blue-500 italic">Active</span>
-                                                    )}
-                                                </td>
-                                                <td className="py-2">
-                                                    {hoursWorked > 0 ? (
+                                            // Determine hours display
+                                            const getHoursDisplay = () => {
+                                                if (a.clock_out && hoursWorked > 0) {
+                                                    return (
                                                         <div>
                                                             <span className="font-medium">{hoursWorked.toFixed(2)} hrs</span>
                                                             {overtime > 0 && (
@@ -642,22 +824,65 @@ export default function EmployeeDashboard() {
                                                                 </span>
                                                             )}
                                                         </div>
-                                                    ) : (
-                                                        <span className="text-gray-400">—</span>
-                                                    )}
-                                                </td>
-                                                <td className="py-2">
-                                                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadge(a.status)}`}>
-                                                        {getStatusLabel(a.status)}
-                                                    </span>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
-                            {attendance.length === 0 && (
-                                <p className="text-gray-500 text-sm mt-4">No attendance records</p>
+                                                    );
+                                                } else if (a.clock_in && !a.clock_out) {
+                                                    return <span className="text-blue-500 italic">In progress</span>;
+                                                } else {
+                                                    return <span className="text-amber-500">Pending</span>;
+                                                }
+                                            };
+
+                                            // Status badge colors
+                                            const getStatusBadge = (status) => {
+                                                switch (status) {
+                                                    case 'present':
+                                                        return 'bg-green-100 text-green-700';
+                                                    case 'half_day':
+                                                        return 'bg-yellow-100 text-yellow-700';
+                                                    case 'absent':
+                                                        return 'bg-red-100 text-red-700';
+                                                    default:
+                                                        return 'bg-blue-100 text-blue-700';
+                                                }
+                                            };
+
+                                            const getStatusLabel = (status) => {
+                                                switch (status) {
+                                                    case 'present': return 'Present';
+                                                    case 'half_day': return 'Half Day';
+                                                    case 'absent': return 'Absent';
+                                                    default: return 'Active';
+                                                }
+                                            };
+
+                                            return (
+                                                <tr key={a.id} className="border-b">
+                                                    <td className="py-2">{formatDateWithDay(a.date)}</td>
+                                                    <td className="py-2 text-green-600 font-medium">
+                                                        {formatTimeStamp(a.clock_in)}
+                                                    </td>
+                                                    <td className="py-2 text-red-600 font-medium">
+                                                        {a.clock_out ? formatTimeStamp(a.clock_out) : (
+                                                            <span className="text-blue-500 italic">Active</span>
+                                                        )}
+                                                    </td>
+                                                    <td className="py-2">
+                                                        {getHoursDisplay()}
+                                                    </td>
+                                                    <td className="py-2">
+                                                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadge(a.status)}`}>
+                                                            {getStatusLabel(a.status)}
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            ) : (
+                                <div className="text-center py-8">
+                                    <p className="text-gray-500">You don't have any attendance records yet.</p>
+                                </div>
                             )}
                         </div>
                     )}
@@ -684,47 +909,144 @@ export default function EmployeeDashboard() {
                     {/* Documents View */}
                     {view === 'docs' && (
                         <div className="bg-white p-4 rounded-lg shadow-sm border max-w-3xl">
-                            <h2 className="text-lg font-semibold mb-3">Docs & Policies</h2>
-                            <ul className="space-y-2">
-                                {documents.map(d => (
-                                    <li key={d.id} className="p-2 border rounded flex items-center justify-between">
-                                        <div>
-                                            <div className="font-medium">{d.title}</div>
-                                            <div className="text-xs text-gray-500">
-                                                {d.document_type} · Uploaded {d.uploaded_at?.slice(0, 10)}
-                                            </div>
-                                            {d.acknowledged && d.acknowledged_at && (
-                                                <div className="text-xs text-green-700">
-                                                    Acknowledged on {d.acknowledged_at.slice(0, 10)}
+                            <div className="mb-4">
+                                <h2 className="text-lg font-semibold">Docs & Policies</h2>
+                                <p className="text-sm text-gray-500">Documents and policies to read and acknowledge</p>
+                            </div>
+                            {documents.length > 0 ? (
+                                <ul className="space-y-3">
+                                    {documents.map(d => (
+                                        <li key={d.id} className="p-3 border rounded-lg flex items-center justify-between bg-gray-50">
+                                            <div>
+                                                <div className="font-medium">{d.title}</div>
+                                                <div className="text-xs text-gray-500 mt-1">
+                                                    {d.document_type}
                                                 </div>
-                                            )}
+                                                {d.acknowledged && d.acknowledged_at && (
+                                                    <div className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                                                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                                        </svg>
+                                                        Acknowledged on {formatDate(d.acknowledged_at.slice(0, 10))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div className="flex items-center gap-2 text-sm">
+                                                {d.document_url && (
+                                                    <a
+                                                        href={d.document_url}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="text-blue-600 hover:underline"
+                                                    >
+                                                        View
+                                                    </a>
+                                                )}
+                                                {!d.acknowledged && (
+                                                    <button
+                                                        onClick={() => acknowledgeDocument(d.id)}
+                                                        className="px-3 py-1.5 border rounded text-xs hover:bg-gray-100"
+                                                    >
+                                                        Acknowledge
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </li>
+                                    ))}
+                                </ul>
+                            ) : (
+                                <div className="text-center py-8">
+                                    <p className="text-gray-500">No policies have been shared with you yet.</p>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* My Compliance Docs View */}
+                    {view === 'compliance' && (
+                        <div className="bg-white p-4 rounded-lg shadow-sm border max-w-3xl">
+                            <div className="mb-4">
+                                <h2 className="text-lg font-semibold">My Compliance Docs</h2>
+                                <p className="text-sm text-gray-500">Upload and manage your required documents</p>
+                            </div>
+
+                            {/* License Information from Profile */}
+                            {profile && (
+                                <div className="space-y-4">
+                                    {/* License Card */}
+                                    <div className="p-4 border rounded-lg bg-gray-50">
+                                        <div className="flex items-start justify-between">
+                                            <div>
+                                                <div className="font-medium text-gray-900">Professional License</div>
+                                                <div className="text-sm text-gray-600 mt-1">
+                                                    {profile.license_type || 'Not specified'} {profile.license_number && `• ${profile.license_number}`}
+                                                </div>
+                                                {profile.license_expiry && (
+                                                    <div className="text-sm text-gray-500 mt-1">
+                                                        Expires: {formatDate(profile.license_expiry)}
+                                                    </div>
+                                                )}
+                                            </div>
+                                            {(() => {
+                                                const days = daysUntil(profile.license_expiry);
+                                                if (days === null) {
+                                                    return <span className="px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">Not set</span>;
+                                                } else if (days < 0) {
+                                                    return <span className="px-3 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700">Expired</span>;
+                                                } else if (days <= 30) {
+                                                    return <span className="px-3 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-700">Expiring</span>;
+                                                } else {
+                                                    return <span className="px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">Valid</span>;
+                                                }
+                                            })()}
                                         </div>
-                                        <div className="flex items-center gap-2 text-sm">
-                                            {d.document_url && (
-                                                <a
-                                                    href={d.document_url}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="text-blue-600 hover:underline"
-                                                >
-                                                    View
-                                                </a>
-                                            )}
-                                            {!d.acknowledged && (
-                                                <button
-                                                    onClick={() => acknowledgeDocument(d.id)}
-                                                    className="px-2 py-1 border rounded text-xs hover:bg-gray-50"
-                                                >
-                                                    Acknowledge
-                                                </button>
-                                            )}
+                                        <div className="mt-3 pt-3 border-t">
+                                            <button
+                                                onClick={() => setView('profile')}
+                                                className="text-sm text-blue-600 hover:underline"
+                                            >
+                                                Update in Profile →
+                                            </button>
                                         </div>
-                                    </li>
-                                ))}
-                                {documents.length === 0 && (
-                                    <p className="text-gray-500 text-sm">No documents available</p>
-                                )}
-                            </ul>
+                                    </div>
+
+                                    {/* KYC Status */}
+                                    <div className="p-4 border rounded-lg bg-gray-50">
+                                        <div className="flex items-start justify-between">
+                                            <div>
+                                                <div className="font-medium text-gray-900">Verification Status</div>
+                                                <div className="text-sm text-gray-500 mt-1">
+                                                    {profile.kyc_status === 'verified'
+                                                        ? 'Your identity has been verified'
+                                                        : profile.kyc_status === 'pending_review'
+                                                            ? 'Your documents are under review'
+                                                            : 'Please submit your verification documents'}
+                                                </div>
+                                            </div>
+                                            <span className={`px-3 py-1 rounded-full text-xs font-medium ${profile.kyc_status === 'verified' ? 'bg-green-100 text-green-700' :
+                                                profile.kyc_status === 'pending_review' ? 'bg-amber-100 text-amber-700' :
+                                                    'bg-gray-100 text-gray-600'
+                                                }`}>
+                                                {profile.kyc_status === 'verified' ? 'Verified' :
+                                                    profile.kyc_status === 'pending_review' ? 'Pending' :
+                                                        'Not started'}
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    {/* Info Banner */}
+                                    {(daysUntil(profile.license_expiry) !== null && daysUntil(profile.license_expiry) < 30) && (
+                                        <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-sm text-amber-800">
+                                            <div className="flex items-center gap-2">
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                                </svg>
+                                                Please update your license details to remain compliant.
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     )}
 
@@ -771,36 +1093,67 @@ function LeaveView({ leaves, showModal, setShowModal, onSubmit }) {
 
     return (
         <>
-            <div className="bg-white p-4 rounded-lg shadow-sm border max-w-2xl">
-                <div className="flex items-center justify-between mb-3">
-                    <h2 className="text-lg font-semibold">My Leave</h2>
-                    <button
-                        onClick={() => setShowModal(true)}
-                        className="px-3 py-2 rounded-md bg-blue-600 text-white text-sm hover:bg-blue-700"
-                    >
-                        Request Leave
-                    </button>
+            <div className="space-y-4 max-w-2xl">
+                {/* Leave Balance Summary */}
+                <div className="bg-white p-4 rounded-lg shadow-sm border">
+                    <h3 className="text-sm font-medium text-gray-700 mb-2">Leave Balance (This Year)</h3>
+                    <div className="text-sm text-gray-600 space-y-1">
+                        <div>Annual: <span className="font-medium">10 days remaining</span></div>
+                        <div>Sick: <span className="font-medium">3 days remaining</span></div>
+                    </div>
                 </div>
-                <div className="space-y-3">
-                    {leaves.map(l => (
-                        <div key={l.id} className="p-3 rounded-md bg-gray-50 border flex items-start justify-between">
-                            <div>
-                                <div className="text-sm font-medium capitalize">{l.leave_type}</div>
-                                <div className="text-xs text-gray-500">
-                                    {l.from_date} to {l.to_date}
-                                </div>
-                                {l.reason && <div className="text-xs mt-1">{l.reason}</div>}
-                            </div>
-                            <span className={`px-2 py-1 rounded-full text-xs font-medium capitalize ${l.status === 'approved' ? 'bg-green-100 text-green-700' :
-                                l.status === 'rejected' ? 'bg-red-100 text-red-700' :
-                                    'bg-yellow-100 text-yellow-700'
-                                }`}>
-                                {l.status}
-                            </span>
+
+                {/* Leave Requests */}
+                <div className="bg-white p-4 rounded-lg shadow-sm border">
+                    <div className="flex items-center justify-between mb-4">
+                        <div>
+                            <h2 className="text-lg font-semibold">Leave Requests</h2>
+                            <p className="text-sm text-gray-500">Your submitted leave requests</p>
                         </div>
-                    ))}
-                    {leaves.length === 0 && (
-                        <p className="text-gray-500 text-sm">No leave requests</p>
+                        <button
+                            onClick={() => setShowModal(true)}
+                            className="px-4 py-2 rounded-md bg-blue-600 text-white text-sm hover:bg-blue-700"
+                        >
+                            Request Leave
+                        </button>
+                    </div>
+                    {leaves.length > 0 ? (
+                        <div className="space-y-3">
+                            {leaves.map(l => {
+                                // Simple date formatter
+                                const formatLeaveDate = (dateStr) => {
+                                    if (!dateStr) return '';
+                                    const date = new Date(dateStr + 'T00:00:00');
+                                    return date.toLocaleDateString('en-GB', {
+                                        day: 'numeric',
+                                        month: 'short',
+                                        year: 'numeric'
+                                    });
+                                };
+
+                                return (
+                                    <div key={l.id} className="p-3 rounded-lg bg-gray-50 border flex items-start justify-between">
+                                        <div>
+                                            <div className="text-sm font-medium capitalize">{l.leave_type} Leave</div>
+                                            <div className="text-sm text-gray-500 mt-1">
+                                                {formatLeaveDate(l.from_date)} – {formatLeaveDate(l.to_date)}
+                                            </div>
+                                            {l.reason && <div className="text-xs text-gray-400 mt-1">{l.reason}</div>}
+                                        </div>
+                                        <span className={`px-3 py-1 rounded-full text-xs font-medium capitalize ${l.status === 'approved' ? 'bg-green-100 text-green-700' :
+                                            l.status === 'rejected' ? 'bg-red-100 text-red-700' :
+                                                'bg-yellow-100 text-yellow-700'
+                                            }`}>
+                                            {l.status}
+                                        </span>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    ) : (
+                        <div className="text-center py-6">
+                            <p className="text-gray-500">You haven't submitted any leave requests.</p>
+                        </div>
                     )}
                 </div>
             </div>
@@ -892,99 +1245,137 @@ function ProfileView({ profile, onUpdate }) {
         setEditMode(false);
     }
 
+    // Title case helper for proper formatting
+    function toTitleCase(str) {
+        if (!str) return '';
+        return str.toLowerCase().split(' ')
+            .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+            .join(' ');
+    }
+
+    // Format clinic display
+    const clinicDisplay = toTitleCase(profile?.clinic_name || '');
+    const locationDisplay = toTitleCase(profile?.location_name || '');
+
     return (
         <div className="bg-white p-4 rounded-lg shadow-sm border max-w-3xl">
-            <div className="flex items-center justify-between mb-3">
-                <h2 className="text-lg font-semibold">Profile</h2>
+            <div className="flex items-center justify-between mb-4">
+                <div>
+                    <h2 className="text-lg font-semibold">Profile</h2>
+                    <p className="text-sm text-gray-500">Your personal and professional information</p>
+                </div>
                 {!editMode && (
                     <button
                         onClick={() => setEditMode(true)}
-                        className="px-3 py-2 rounded-md bg-blue-600 text-white text-sm hover:bg-blue-700"
+                        className="px-4 py-2 rounded-md bg-blue-600 text-white text-sm hover:bg-blue-700"
                     >
-                        Edit
+                        Edit Profile
                     </button>
                 )}
             </div>
 
             <form onSubmit={handleSubmit}>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-6">
+                    {/* Personal Information */}
                     <div>
-                        <label className="text-xs text-gray-600">First Name</label>
-                        <input
-                            value={profile?.first_name || ''}
-                            readOnly
-                            className="border p-2 rounded w-full bg-gray-50"
-                        />
+                        <h3 className="text-sm font-medium text-gray-700 mb-3">Personal Information</h3>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="text-xs text-gray-500">First Name</label>
+                                <input
+                                    value={toTitleCase(profile?.first_name || '')}
+                                    readOnly
+                                    className="border p-2 rounded w-full bg-gray-50 mt-1"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-xs text-gray-500">Last Name</label>
+                                <input
+                                    value={toTitleCase(profile?.last_name || '')}
+                                    readOnly
+                                    className="border p-2 rounded w-full bg-gray-50 mt-1"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-xs text-gray-500">Phone</label>
+                                <input
+                                    value={formData.phone}
+                                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                                    readOnly={!editMode}
+                                    className={`border p-2 rounded w-full mt-1 ${!editMode ? 'bg-gray-50' : 'bg-white'}`}
+                                />
+                            </div>
+                            <div>
+                                <label className="text-xs text-gray-500">Email</label>
+                                <input
+                                    value={formData.email}
+                                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                                    readOnly={!editMode}
+                                    className={`border p-2 rounded w-full mt-1 ${!editMode ? 'bg-gray-50' : 'bg-white'}`}
+                                />
+                            </div>
+                        </div>
                     </div>
+
+                    {/* Work Information */}
                     <div>
-                        <label className="text-xs text-gray-600">Last Name</label>
-                        <input
-                            value={profile?.last_name || ''}
-                            readOnly
-                            className="border p-2 rounded w-full bg-gray-50"
-                        />
+                        <h3 className="text-sm font-medium text-gray-700 mb-3">Work Information</h3>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="text-xs text-gray-500">Role</label>
+                                <input
+                                    value={toTitleCase(profile?.job_role || profile?.role || '')}
+                                    readOnly
+                                    className="border p-2 rounded w-full bg-gray-50 mt-1"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-xs text-gray-500">Clinic</label>
+                                <input
+                                    value={clinicDisplay + (locationDisplay ? ` • ${locationDisplay}` : '')}
+                                    readOnly
+                                    className="border p-2 rounded w-full bg-gray-50 mt-1"
+                                />
+                            </div>
+                        </div>
                     </div>
+
+                    {/* License Information */}
                     <div>
-                        <label className="text-xs text-gray-600">Role</label>
-                        <input
-                            value={profile?.role || ''}
-                            readOnly
-                            className="border p-2 rounded w-full bg-gray-50"
-                        />
-                    </div>
-                    <div>
-                        <label className="text-xs text-gray-600">Clinic</label>
-                        <input
-                            value={`${profile?.clinic_name || ''} (${profile?.location_name || ''})`}
-                            readOnly
-                            className="border p-2 rounded w-full bg-gray-50"
-                        />
-                    </div>
-                    <div>
-                        <label className="text-xs text-gray-600">Phone</label>
-                        <input
-                            value={formData.phone}
-                            onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                            readOnly={!editMode}
-                            className={`border p-2 rounded w-full ${!editMode ? 'bg-gray-50' : ''}`}
-                        />
-                    </div>
-                    <div>
-                        <label className="text-xs text-gray-600">Email</label>
-                        <input
-                            value={formData.email}
-                            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                            readOnly={!editMode}
-                            className={`border p-2 rounded w-full ${!editMode ? 'bg-gray-50' : ''}`}
-                        />
-                    </div>
-                    <div>
-                        <label className="text-xs text-gray-600">License Type</label>
-                        <input
-                            value={formData.license_type}
-                            onChange={(e) => setFormData({ ...formData, license_type: e.target.value })}
-                            readOnly={!editMode}
-                            className={`border p-2 rounded w-full ${!editMode ? 'bg-gray-50' : ''}`}
-                        />
-                    </div>
-                    <div>
-                        <label className="text-xs text-gray-600">License Number</label>
-                        <input
-                            value={formData.license_number}
-                            onChange={(e) => setFormData({ ...formData, license_number: e.target.value })}
-                            readOnly={!editMode}
-                            className={`border p-2 rounded w-full ${!editMode ? 'bg-gray-50' : ''}`}
-                        />
-                    </div>
-                    <div>
-                        <label className="text-xs text-gray-600">License Expiry</label>
-                        <input
-                            type="date"
-                            value={formData.license_expiry}
-                            onChange={(e) => setFormData({ ...formData, license_expiry: e.target.value })}
-                            readOnly={!editMode}
-                            className={`border p-2 rounded w-full ${!editMode ? 'bg-gray-50' : ''}`}
-                        />
+                        <div className="flex items-center justify-between mb-3">
+                            <h3 className="text-sm font-medium text-gray-700">License Information</h3>
+                            <span className="text-xs text-gray-400">Managed in My Compliance Docs</span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-4">
+                            <div>
+                                <label className="text-xs text-gray-500">License Type</label>
+                                <input
+                                    value={formData.license_type.toUpperCase()}
+                                    onChange={(e) => setFormData({ ...formData, license_type: e.target.value })}
+                                    readOnly={!editMode}
+                                    className={`border p-2 rounded w-full mt-1 ${!editMode ? 'bg-gray-50' : 'bg-white'}`}
+                                />
+                            </div>
+                            <div>
+                                <label className="text-xs text-gray-500">License Number</label>
+                                <input
+                                    value={formData.license_number}
+                                    onChange={(e) => setFormData({ ...formData, license_number: e.target.value })}
+                                    readOnly={!editMode}
+                                    className={`border p-2 rounded w-full mt-1 ${!editMode ? 'bg-gray-50' : 'bg-white'}`}
+                                />
+                            </div>
+                            <div>
+                                <label className="text-xs text-gray-500">License Expiry</label>
+                                <input
+                                    type="date"
+                                    value={formData.license_expiry}
+                                    onChange={(e) => setFormData({ ...formData, license_expiry: e.target.value })}
+                                    readOnly={!editMode}
+                                    className={`border p-2 rounded w-full mt-1 ${!editMode ? 'bg-gray-50' : 'bg-white'}`}
+                                />
+                            </div>
+                        </div>
                     </div>
                 </div>
 

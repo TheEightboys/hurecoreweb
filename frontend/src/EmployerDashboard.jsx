@@ -318,6 +318,70 @@ export default function EmployerDashboard() {
         return classes[status] || 'bg-gray-100 text-gray-600';
     };
 
+    // Human-readable date format (e.g., "24 Dec 2025")
+    const formatDate = (dateStr) => {
+        if (!dateStr) return '';
+        const date = new Date(dateStr + 'T00:00:00');
+        return date.toLocaleDateString('en-GB', {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric'
+        });
+    };
+
+    // Format time for display (e.g., "18:21")
+    const formatShiftTime = (timeStr) => {
+        if (!timeStr) return '';
+        // Handle full timestamp or time-only string
+        if (timeStr.includes('T')) {
+            return new Date(timeStr).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+        }
+        return timeStr.slice(0, 5); // HH:MM from HH:MM:SS
+    };
+
+    // Check if shift has passed and return effective status
+    const getEffectiveShiftStatus = (shift) => {
+        if (!shift.date || !shift.end_time) return shift.status || 'open';
+
+        // Combine date and end time to check if shift has passed
+        const shiftEndDateTime = new Date(`${shift.date}T${shift.end_time}`);
+        const now = new Date();
+
+        // If the shift end time has passed and it's not already marked as completed/closed
+        if (shiftEndDateTime < now && !['completed', 'closed', 'cancelled'].includes(shift.status?.toLowerCase())) {
+            return 'closed'; // Override to closed for past shifts
+        }
+
+        return shift.status || 'open';
+    };
+
+    // Shift status label and styling for employer view
+    const getShiftStatusLabel = (status) => {
+        switch (status?.toLowerCase()) {
+            case 'open': return 'Open';
+            case 'assigned': return 'Assigned';
+            case 'confirmed': return 'Confirmed';
+            case 'declined': return 'Declined';
+            case 'completed': return 'Closed';
+            case 'closed': return 'Closed';
+            case 'cancelled': return 'Cancelled';
+            default: return status || 'Open';
+        }
+    };
+
+    const getShiftStatusClass = (status) => {
+        switch (status?.toLowerCase()) {
+            case 'open': return 'bg-orange-100 text-orange-700';
+            case 'assigned': return 'bg-blue-100 text-blue-700';
+            case 'confirmed': return 'bg-green-100 text-green-700';
+            case 'declined': return 'bg-red-100 text-red-700';
+            case 'completed': return 'bg-gray-200 text-gray-700';
+            case 'closed': return 'bg-gray-200 text-gray-700';
+            case 'cancelled': return 'bg-gray-100 text-gray-500';
+            default: return 'bg-orange-100 text-orange-700';
+        }
+    };
+
     // No clinic ID - show message
     if (!clinicId) {
         return (
@@ -546,12 +610,13 @@ export default function EmployerDashboard() {
                                         {shifts.slice(0, 5).map(s => (
                                             <div key={s.id} className="flex items-center justify-between p-2 bg-gray-50 rounded">
                                                 <div>
-                                                    <div className="text-sm font-medium">{s.required_role} - {s.date}</div>
-                                                    <div className="text-xs text-gray-500">{s.start_time} - {s.end_time}</div>
+                                                    <div className="text-sm font-medium">{s.required_role}</div>
+                                                    <div className="text-xs text-gray-500">
+                                                        {formatDate(s.date)} • {formatShiftTime(s.start_time)} – {formatShiftTime(s.end_time)}
+                                                    </div>
                                                 </div>
-                                                <span className={`px-2 py-0.5 rounded-full text-xs ${s.status === 'open' ? 'bg-orange-100 text-orange-700' : 'bg-green-100 text-green-700'
-                                                    }`}>
-                                                    {s.status}
+                                                <span className={`px-2 py-0.5 rounded-full text-xs ${getShiftStatusClass(getEffectiveShiftStatus(s))}`}>
+                                                    {getShiftStatusLabel(getEffectiveShiftStatus(s))}
                                                 </span>
                                             </div>
                                         ))}
@@ -667,7 +732,7 @@ export default function EmployerDashboard() {
                                         <div>
                                             <div className="font-medium">{s.required_role}</div>
                                             <div className="text-sm text-gray-500">
-                                                {s.date} · {s.start_time} - {s.end_time}
+                                                {formatDate(s.date)} • {formatShiftTime(s.start_time)} – {formatShiftTime(s.end_time)}
                                             </div>
                                             {s.staff && (
                                                 <div className="text-sm text-emerald-600 mt-1">
@@ -675,9 +740,8 @@ export default function EmployerDashboard() {
                                                 </div>
                                             )}
                                         </div>
-                                        <span className={`px-3 py-1 rounded-full text-xs ${s.status === 'open' ? 'bg-orange-100 text-orange-700' : 'bg-green-100 text-green-700'
-                                            }`}>
-                                            {s.status}
+                                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${getShiftStatusClass(getEffectiveShiftStatus(s))}`}>
+                                            {getShiftStatusLabel(getEffectiveShiftStatus(s))}
                                         </span>
                                     </div>
                                 ))}
