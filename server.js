@@ -31,6 +31,13 @@ const leaveRoutes = require('./routes/leave');
 const locationsRoutes = require('./routes/locations');
 const settingsRoutes = require('./routes/clinic-settings');
 
+// New: Coverage-first scheduling, payroll, verification, audit
+const scheduleBlocksRoutes = require('./routes/scheduleBlocks');
+const payrollRoutes = require('./routes/payroll');
+const verificationRoutes = require('./routes/verification');
+const auditLogsRoutes = require('./routes/auditLogs');
+const verificationsRoutes = require('./routes/verifications'); // SuperAdmin verification review
+
 // Employee Portal routes
 const employeeRoutes = require('./routes/employee');
 
@@ -56,6 +63,16 @@ app.use('/api/clinics', attendanceRoutes); // /api/clinics/:clinicId/attendance
 app.use('/api/clinics', leaveRoutes);      // /api/clinics/:clinicId/leave
 app.use('/api/clinics', locationsRoutes);  // /api/clinics/:clinicId/locations
 app.use('/api/clinics', settingsRoutes);   // /api/clinics/:clinicId/settings
+
+// New: Coverage-first scheduling, payroll, verification, audit log routes
+app.use('/api/employer', scheduleBlocksRoutes);  // /api/employer/:clinicId/schedule-blocks
+app.use('/api/employer', payrollRoutes);         // /api/employer/:clinicId/payroll
+app.use('/api/employer', verificationRoutes);    // /api/employer/:clinicId/org-verification
+app.use('/api/employer', auditLogsRoutes);       // /api/employer/:clinicId/audit
+
+// SuperAdmin verification review routes
+app.use('/api/verifications', verificationsRoutes);  // /api/verifications/pending, /approve, /reject
+
 
 // Staff auth & invite routes (public - must be separate router to avoid route conflicts)
 app.use('/api/staff', staffAuthRoutes);    // /api/staff/login, /api/staff/accept-invite, /api/staff/verify-invite

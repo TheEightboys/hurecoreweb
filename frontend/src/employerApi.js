@@ -261,5 +261,132 @@ export const settingsAPI = {
     },
 };
 
+// ============================================
+// SCHEDULE BLOCKS API (Coverage-first model)
+// ============================================
+
+export const scheduleBlocksAPI = {
+    list: (clinicId, locationId = null) => {
+        const params = locationId && locationId !== 'ALL' ? `?location=${locationId}` : '';
+        return fetchAPI(`/employer/${clinicId}/schedule-blocks${params}`);
+    },
+
+    create: (clinicId, data) => {
+        return fetchAPI(`/employer/${clinicId}/schedule-blocks`, {
+            method: 'POST',
+            body: JSON.stringify(data),
+        });
+    },
+
+    update: (clinicId, blockId, data) => {
+        return fetchAPI(`/employer/${clinicId}/schedule-blocks/${blockId}`, {
+            method: 'PUT',
+            body: JSON.stringify(data),
+        });
+    },
+
+    delete: (clinicId, blockId) => {
+        return fetchAPI(`/employer/${clinicId}/schedule-blocks/${blockId}`, {
+            method: 'DELETE',
+        });
+    },
+
+    assignStaff: (clinicId, blockId, staffId, action = 'add') => {
+        return fetchAPI(`/employer/${clinicId}/schedule-blocks/${blockId}/assign`, {
+            method: 'PUT',
+            body: JSON.stringify({ staff_id: staffId, action }),
+        });
+    },
+
+    manageLocum: (clinicId, blockId, { action, locum, locum_id }) => {
+        return fetchAPI(`/employer/${clinicId}/schedule-blocks/${blockId}/locum`, {
+            method: 'PUT',
+            body: JSON.stringify({ action, locum, locum_id }),
+        });
+    },
+};
+
+// ============================================
+// PAYROLL API
+// ============================================
+
+export const payrollAPI = {
+    list: (clinicId, params = {}) => {
+        const query = new URLSearchParams(params).toString();
+        return fetchAPI(`/employer/${clinicId}/payroll${query ? `?${query}` : ''}`);
+    },
+
+    upsert: (clinicId, data) => {
+        return fetchAPI(`/employer/${clinicId}/payroll`, {
+            method: 'POST',
+            body: JSON.stringify(data),
+        });
+    },
+
+    updateStatus: (clinicId, payrollKey, status) => {
+        return fetchAPI(`/employer/${clinicId}/payroll/${encodeURIComponent(payrollKey)}/status`, {
+            method: 'PUT',
+            body: JSON.stringify({ status }),
+        });
+    },
+
+    bulkUpdateStatus: (clinicId, payrollKeys, status) => {
+        return fetchAPI(`/employer/${clinicId}/payroll/bulk-status`, {
+            method: 'PUT',
+            body: JSON.stringify({ payroll_keys: payrollKeys, status }),
+        });
+    },
+};
+
+// ============================================
+// VERIFICATION API
+// ============================================
+
+export const verificationAPI = {
+    getOrg: (clinicId) => {
+        return fetchAPI(`/employer/${clinicId}/org-verification`);
+    },
+
+    updateOrg: (clinicId, data) => {
+        return fetchAPI(`/employer/${clinicId}/org-verification`, {
+            method: 'PUT',
+            body: JSON.stringify(data),
+        });
+    },
+
+    getFacility: (clinicId, locationId) => {
+        return fetchAPI(`/employer/${clinicId}/locations/${locationId}/verification`);
+    },
+
+    updateFacility: (clinicId, locationId, data) => {
+        return fetchAPI(`/employer/${clinicId}/locations/${locationId}/verification`, {
+            method: 'PUT',
+            body: JSON.stringify(data),
+        });
+    },
+};
+
+// ============================================
+// AUDIT LOG API
+// ============================================
+
+export const auditAPI = {
+    list: (clinicId, locationId = null, limit = 100) => {
+        const params = new URLSearchParams({ limit });
+        if (locationId && locationId !== 'ALL') {
+            params.set('location', locationId);
+        }
+        return fetchAPI(`/employer/${clinicId}/audit?${params.toString()}`);
+    },
+
+    add: (clinicId, data) => {
+        return fetchAPI(`/employer/${clinicId}/audit`, {
+            method: 'POST',
+            body: JSON.stringify(data),
+        });
+    },
+};
+
 // Export helper functions
 export { getToken, getClinicId };
+

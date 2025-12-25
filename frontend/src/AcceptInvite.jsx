@@ -98,13 +98,13 @@ export default function AcceptInvite() {
 
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
                     <p className="text-sm text-gray-700">
-                        <span className="font-semibold">Name:</span> {inviteData?.staff?.name}
+                        <span className="font-semibold">Name:</span> {inviteData?.staff?.name || 'Not specified'}
                     </p>
                     <p className="text-sm text-gray-700 mt-1">
-                        <span className="font-semibold">Email:</span> {inviteData?.staff?.email}
+                        <span className="font-semibold">Email:</span> {inviteData?.staff?.email || 'Not specified'}
                     </p>
                     <p className="text-sm text-gray-700 mt-1">
-                        <span className="font-semibold">Role:</span> {inviteData?.staff?.jobRole}
+                        <span className="font-semibold">Role:</span> {inviteData?.staff?.jobRole || 'Employee'}
                     </p>
                 </div>
 

@@ -116,7 +116,7 @@ router.patch('/profile', requireStaff, async (req, res) => {
 
 /**
  * GET /api/employee/schedule
- * Get staff member's assigned shifts AND open shifts matching their role
+ * Get staff member's assigned shifts from schedule_blocks
  */
 router.get('/schedule', requireStaff, async (req, res) => {
     try {
@@ -125,7 +125,7 @@ router.get('/schedule', requireStaff, async (req, res) => {
         // First get the staff member's details (job_role and clinic_id)
         const { data: staffData, error: staffError } = await supabaseAdmin
             .from('staff')
-            .select('job_role, clinic_id')
+            .select('job_role, clinic_id, location_id')
             .eq('id', req.user.staffId)
             .single();
 
@@ -140,77 +140,40 @@ router.get('/schedule', requireStaff, async (req, res) => {
             jobRole: staffData.job_role
         });
 
-        // Query 1: Get shifts directly assigned to this staff member
-        let assignedQuery = supabaseAdmin
-            .from('shifts')
-            .select('*')
-            .eq('staff_id', req.user.staffId)
-            .order('date', { ascending: true });
-
-        if (from) assignedQuery = assignedQuery.gte('date', from);
-        if (to) assignedQuery = assignedQuery.lte('date', to);
-
-        // Query 2: Get open shifts that match the staff member's role and clinic
-        let openQuery = supabaseAdmin
-            .from('shifts')
-            .select('*')
+        // Query schedule_blocks where this staff is assigned
+        let blocksQuery = supabaseAdmin
+            .from('schedule_blocks')
+            .select('*, location:clinic_locations(name)')
             .eq('clinic_id', staffData.clinic_id)
-            .eq('status', 'open')
-            .eq('required_role', staffData.job_role)
-            .order('date', { ascending: true });
+            .contains('assigned_staff_ids', [req.user.staffId])
+            .order('date', { ascending: true })
+            .order('start_time', { ascending: true });
 
-        if (from) openQuery = openQuery.gte('date', from);
-        if (to) openQuery = openQuery.lte('date', to);
+        if (from) blocksQuery = blocksQuery.gte('date', from);
+        if (to) blocksQuery = blocksQuery.lte('date', to);
 
-        // Execute both queries in parallel
-        const [assignedResult, openResult] = await Promise.all([
-            assignedQuery,
-            openQuery
-        ]);
+        const { data: assignedBlocks, error: blocksError } = await blocksQuery;
 
-        if (assignedResult.error) {
-            console.error('Assigned shifts query error:', assignedResult.error);
+        if (blocksError) {
+            console.error('Schedule blocks query error:', blocksError);
             return res.status(500).json({ error: 'Failed to fetch schedule' });
         }
 
-        if (openResult.error) {
-            console.error('Open shifts query error:', openResult.error);
-            return res.status(500).json({ error: 'Failed to fetch schedule' });
-        }
-
-
-        // Combine and deduplicate shifts (in case of overlap)
-        const allShifts = [...(assignedResult.data || []), ...(openResult.data || [])];
-
-        console.log('[DEBUG] Shift query results:', {
-            assignedCount: assignedResult.data?.length || 0,
-            openCount: openResult.data?.length || 0,
-            assignedShifts: assignedResult.data,
-            openShifts: openResult.data
-        });
-        const uniqueShifts = allShifts.reduce((acc, shift) => {
-            if (!acc.find(s => s.id === shift.id)) {
-                acc.push(shift);
-            }
-            return acc;
-        }, []);
-
-        // Sort by date and time
-        uniqueShifts.sort((a, b) => {
-            const dateCompare = a.date.localeCompare(b.date);
-            if (dateCompare !== 0) return dateCompare;
-            return a.start_time.localeCompare(b.start_time);
+        console.log('[DEBUG] Schedule blocks query results:', {
+            assignedCount: assignedBlocks?.length || 0,
+            assignedBlocks: assignedBlocks
         });
 
-        // Map to expected format
-        const shifts = uniqueShifts.map(s => ({
-            id: s.id,
-            date: s.date,
-            start_time: s.start_time,
-            end_time: s.end_time,
-            role: s.required_role || 'Shift',
-            status: s.status || 'assigned',
-            isOpenShift: s.status === 'open',
+        // Map schedule blocks to shifts for the frontend
+        const shifts = (assignedBlocks || []).map(b => ({
+            id: b.id,
+            date: b.date,
+            start_time: b.start_time,
+            end_time: b.end_time,
+            role: b.role_needed || 'Shift',
+            location: b.location?.name || 'Main Location',
+            status: 'scheduled',
+            isOpenShift: false,
             decline_reason: null
         }));
 

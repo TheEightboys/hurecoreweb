@@ -163,6 +163,36 @@ export async function getApiLogs(params = {}) {
 }
 
 // ============================================
+// VERIFICATION APIs (SuperAdmin)
+// ============================================
+
+export async function getPendingVerifications() {
+    return apiFetch('/api/verifications/pending');
+}
+
+export async function approveOrgVerification(clinicId) {
+    return apiFetch(`/api/verifications/org/${clinicId}/approve`, { method: 'PATCH' });
+}
+
+export async function rejectOrgVerification(clinicId, reason) {
+    return apiFetch(`/api/verifications/org/${clinicId}/reject`, {
+        method: 'PATCH',
+        body: JSON.stringify({ reason })
+    });
+}
+
+export async function approveFacilityVerification(clinicId, locationId) {
+    return apiFetch(`/api/verifications/facility/${clinicId}/${locationId}/approve`, { method: 'PATCH' });
+}
+
+export async function rejectFacilityVerification(clinicId, locationId, reason) {
+    return apiFetch(`/api/verifications/facility/${clinicId}/${locationId}/reject`, {
+        method: 'PATCH',
+        body: JSON.stringify({ reason })
+    });
+}
+
+// ============================================
 // SITE CONTENT APIs
 // ============================================
 

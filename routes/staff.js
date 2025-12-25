@@ -101,6 +101,8 @@ router.post('/:clinicId/staff', async (req, res) => {
             employmentStatus = 'inactive'
         } = req.body;
 
+        console.log('Create staff - received data:', { firstName, lastName, email, jobRole, accountRole, licenseType, licenseNumber, licenseExpiry });
+
         // Validation
         if (!firstName || !lastName) {
             return res.status(400).json({ error: 'First name and last name are required' });
@@ -186,6 +188,7 @@ router.patch('/:clinicId/staff/:staffId', async (req, res) => {
         if (updates.licenseType !== undefined) dbUpdates.license_type = updates.licenseType;
         if (updates.licenseNumber !== undefined) dbUpdates.license_number = updates.licenseNumber;
         if (updates.licenseExpiry !== undefined) dbUpdates.license_expiry = updates.licenseExpiry;
+        if (updates.inviteStatus !== undefined) dbUpdates.invite_status = updates.inviteStatus;
 
         dbUpdates.updated_at = new Date().toISOString();
 
@@ -308,9 +311,10 @@ router.post('/:clinicId/staff/:staffId/invite', async (req, res) => {
 
             const emailResult = await sendStaffInviteEmail(
                 staff.email,
-                `${staff.first_name} ${staff.last_name}`,
+                `${staff.first_name || ''} ${staff.last_name || ''}`.trim() || 'Team Member',
                 clinic?.name || 'HURE Clinic',
-                inviteUrl
+                inviteUrl,
+                staff.job_role || 'Employee'
             );
 
             console.log('Email send result:', emailResult);
@@ -379,6 +383,7 @@ router.patch('/:clinicId/staff/:staffId/kyc', async (req, res) => {
 
         const updates = {
             kyc_status: status,
+            vetting_status: status, // Also update vetting_status for consistency
             updated_at: new Date().toISOString()
         };
 
@@ -431,6 +436,7 @@ router.get('/verify-invite', async (req, res) => {
                 last_name,
                 email,
                 job_role,
+                account_role,
                 invite_status,
                 invite_expires_at,
                 clinic:clinics(id, name, town)
@@ -439,6 +445,7 @@ router.get('/verify-invite', async (req, res) => {
             .single();
 
         if (error || !staff) {
+            console.log('Verify invite - not found for token:', token);
             return res.status(404).json({ error: 'Invalid invite token' });
         }
 
@@ -450,12 +457,20 @@ router.get('/verify-invite', async (req, res) => {
             return res.status(400).json({ error: 'Invite has expired' });
         }
 
+        console.log('Verify invite - staff found:', staff);
+
+        // Build full name, handling null values
+        const firstName = staff.first_name || '';
+        const lastName = staff.last_name || '';
+        const fullName = `${firstName} ${lastName}`.trim() || 'Staff Member';
+
         res.json({
             success: true,
             staff: {
-                name: `${staff.first_name} ${staff.last_name}`,
+                name: fullName,
                 email: staff.email,
-                jobRole: staff.job_role,
+                jobRole: staff.job_role || 'Employee',
+                accountRole: staff.account_role || 'employee',
                 clinic: staff.clinic
             }
         });
@@ -506,23 +521,32 @@ router.post('/accept-invite', async (req, res) => {
         const salt = await bcrypt.genSalt(10);
         const passwordHash = await bcrypt.hash(password, salt);
 
-        // Update staff
-        const { error: updateError } = await supabaseAdmin
+        // Update staff - set invite_status to accepted and activate the employee
+        const updateData = {
+            password_hash: passwordHash,
+            invite_status: 'accepted',
+            invite_token: null,
+            invite_accepted_at: new Date().toISOString(),
+            status: 'active',
+            employment_status: 'active', // Also activate employment
+            updated_at: new Date().toISOString()
+        };
+
+        console.log('Accept invite - updating staff', staff.id, 'with:', updateData);
+
+        const { data: updatedStaff, error: updateError } = await supabaseAdmin
             .from('staff')
-            .update({
-                password_hash: passwordHash,
-                invite_status: 'accepted',
-                invite_token: null,
-                invite_accepted_at: new Date().toISOString(),
-                status: 'active',
-                updated_at: new Date().toISOString()
-            })
-            .eq('id', staff.id);
+            .update(updateData)
+            .eq('id', staff.id)
+            .select()
+            .single();
 
         if (updateError) {
             console.error('Accept invite error:', updateError);
             return res.status(500).json({ error: 'Failed to accept invite' });
         }
+
+        console.log('Accept invite - staff updated successfully:', updatedStaff?.id, 'invite_status:', updatedStaff?.invite_status);
 
         // Generate auth token
         const { generateToken } = require('../lib/auth');

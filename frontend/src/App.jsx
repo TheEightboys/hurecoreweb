@@ -623,6 +623,197 @@ export default function HureSuperadminApp() {
         );
     };
 
+    // Verifications Tab
+    const VerificationsTab = () => {
+        const [pendingVerifications, setPendingVerifications] = useState({ organizations: [], facilities: [] });
+        const [loadingVerifications, setLoadingVerifications] = useState(true);
+
+        useEffect(() => {
+            loadVerifications();
+        }, []);
+
+        const loadVerifications = async () => {
+            try {
+                const res = await api.getPendingVerifications();
+                setPendingVerifications(res.data || { organizations: [], facilities: [] });
+            } catch (err) {
+                console.error('Failed to load verifications:', err);
+            } finally {
+                setLoadingVerifications(false);
+            }
+        };
+
+        const handleApproveOrg = async (clinicId) => {
+            try {
+                await api.approveOrgVerification(clinicId);
+                loadVerifications();
+                loadDashboardData();
+            } catch (err) {
+                alert('Failed to approve: ' + err.message);
+            }
+        };
+
+        const handleRejectOrg = async (clinicId) => {
+            const reason = prompt('Reason for rejection (optional):');
+            try {
+                await api.rejectOrgVerification(clinicId, reason);
+                loadVerifications();
+                loadDashboardData();
+            } catch (err) {
+                alert('Failed to reject: ' + err.message);
+            }
+        };
+
+        const handleApproveFacility = async (clinicId, locationId) => {
+            try {
+                await api.approveFacilityVerification(clinicId, locationId);
+                loadVerifications();
+                loadDashboardData();
+            } catch (err) {
+                alert('Failed to approve: ' + err.message);
+            }
+        };
+
+        const handleRejectFacility = async (clinicId, locationId) => {
+            const reason = prompt('Reason for rejection (optional):');
+            try {
+                await api.rejectFacilityVerification(clinicId, locationId, reason);
+                loadVerifications();
+                loadDashboardData();
+            } catch (err) {
+                alert('Failed to reject: ' + err.message);
+            }
+        };
+
+        if (loadingVerifications) {
+            return <div className="text-center py-8 text-slate-500">Loading verifications...</div>;
+        }
+
+        return (
+            <div className="space-y-6">
+                {/* Organization Verifications */}
+                <div className="space-y-3">
+                    <h2 className="font-semibold text-sm flex items-center gap-2">
+                        Organization Verifications
+                        {pendingVerifications.organizations.length > 0 && (
+                            <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full text-xs">
+                                {pendingVerifications.organizations.length} pending
+                            </span>
+                        )}
+                    </h2>
+                    <div className="bg-white border rounded-lg overflow-hidden">
+                        <table className="w-full text-sm">
+                            <thead className="bg-slate-50 text-left text-xs text-slate-500 border-b">
+                                <tr>
+                                    <th className="px-3 py-2">Clinic</th>
+                                    <th className="px-3 py-2">Email</th>
+                                    <th className="px-3 py-2">KRA PIN</th>
+                                    <th className="px-3 py-2">Business Reg No</th>
+                                    <th className="px-3 py-2">Submitted</th>
+                                    <th className="px-3 py-2">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {pendingVerifications.organizations.map(o => (
+                                    <tr key={o.id} className="border-t">
+                                        <td className="px-3 py-2 font-medium">{o.name}</td>
+                                        <td className="px-3 py-2 text-xs">{o.email}</td>
+                                        <td className="px-3 py-2 text-xs font-mono">{o.kra_pin || '-'}</td>
+                                        <td className="px-3 py-2 text-xs font-mono">{o.business_reg_no || '-'}</td>
+                                        <td className="px-3 py-2 text-xs">{new Date(o.created_at).toLocaleDateString()}</td>
+                                        <td className="px-3 py-2">
+                                            <div className="flex gap-2">
+                                                <button
+                                                    onClick={() => handleApproveOrg(o.id)}
+                                                    className="px-2 py-1 text-xs rounded bg-emerald-600 text-white hover:bg-emerald-700"
+                                                >
+                                                    Approve
+                                                </button>
+                                                <button
+                                                    onClick={() => handleRejectOrg(o.id)}
+                                                    className="px-2 py-1 text-xs rounded border hover:bg-slate-50"
+                                                >
+                                                    Reject
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                                {pendingVerifications.organizations.length === 0 && (
+                                    <tr>
+                                        <td className="px-3 py-4 text-xs text-slate-500" colSpan={6}>
+                                            No pending organization verifications.
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                {/* Facility Verifications */}
+                <div className="space-y-3">
+                    <h2 className="font-semibold text-sm flex items-center gap-2">
+                        Facility Verifications
+                        {pendingVerifications.facilities.length > 0 && (
+                            <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full text-xs">
+                                {pendingVerifications.facilities.length} pending
+                            </span>
+                        )}
+                    </h2>
+                    <div className="bg-white border rounded-lg overflow-hidden">
+                        <table className="w-full text-sm">
+                            <thead className="bg-slate-50 text-left text-xs text-slate-500 border-b">
+                                <tr>
+                                    <th className="px-3 py-2">Location</th>
+                                    <th className="px-3 py-2">Clinic</th>
+                                    <th className="px-3 py-2">License No</th>
+                                    <th className="px-3 py-2">Licensing Body</th>
+                                    <th className="px-3 py-2">Expiry</th>
+                                    <th className="px-3 py-2">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {pendingVerifications.facilities.map(f => (
+                                    <tr key={f.id} className="border-t">
+                                        <td className="px-3 py-2 font-medium">{f.name}</td>
+                                        <td className="px-3 py-2 text-xs">{f.clinic?.name || 'N/A'}</td>
+                                        <td className="px-3 py-2 text-xs font-mono">{f.license_no || '-'}</td>
+                                        <td className="px-3 py-2 text-xs">{f.licensing_body || '-'}</td>
+                                        <td className="px-3 py-2 text-xs">{f.license_expiry ? new Date(f.license_expiry).toLocaleDateString() : '-'}</td>
+                                        <td className="px-3 py-2">
+                                            <div className="flex gap-2">
+                                                <button
+                                                    onClick={() => handleApproveFacility(f.clinic_id, f.id)}
+                                                    className="px-2 py-1 text-xs rounded bg-emerald-600 text-white hover:bg-emerald-700"
+                                                >
+                                                    Approve
+                                                </button>
+                                                <button
+                                                    onClick={() => handleRejectFacility(f.clinic_id, f.id)}
+                                                    className="px-2 py-1 text-xs rounded border hover:bg-slate-50"
+                                                >
+                                                    Reject
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                                {pendingVerifications.facilities.length === 0 && (
+                                    <tr>
+                                        <td className="px-3 py-4 text-xs text-slate-500" colSpan={6}>
+                                            No pending facility verifications.
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
     // Audit Tab
     const AuditTab = () => (
         <div className="space-y-3">
@@ -736,6 +927,7 @@ export default function HureSuperadminApp() {
             case 'Transactions': return <TransactionsTab />;
             case 'Subscriptions': return <SubscriptionsTab />;
             case 'Promos': return <PromosTab />;
+            case 'Verifications': return <VerificationsTab />;
             case 'Audit': return <AuditTab />;
             case 'Site Content': return <SiteContentTab />;
             case 'Settings': return <SettingsTab />;
@@ -784,6 +976,7 @@ export default function HureSuperadminApp() {
                     {[
                         'Dashboard',
                         'Pending Onboarding',
+                        'Verifications',
                         'Clinics',
                         'Transactions',
                         'Subscriptions',
