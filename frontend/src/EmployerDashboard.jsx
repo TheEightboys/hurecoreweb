@@ -395,12 +395,26 @@ export default function EmployerDashboard() {
 
     const TopBar = () => (
         <div className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-slate-200">
-            <div className="px-6 py-3 flex items-center justify-between">
+            <div className="px-4 lg:px-6 py-3 flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center text-white font-bold text-sm shadow-sm">
+                    {/* Mobile Menu Button */}
+                    <button
+                        onClick={() => setSidebarOpen(!sidebarOpen)}
+                        className="lg:hidden p-2 -ml-2 rounded-lg hover:bg-slate-100 transition-colors"
+                    >
+                        <svg className="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            {sidebarOpen ? (
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            ) : (
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                            )}
+                        </svg>
+                    </button>
+
+                    <div className="w-8 h-8 lg:w-9 lg:h-9 rounded-lg bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center text-white font-bold text-xs lg:text-sm shadow-sm">
                         {org.name?.charAt(0)?.toUpperCase() || 'H'}
                     </div>
-                    <div>
+                    <div className="hidden sm:block">
                         <div className="text-sm font-semibold text-slate-900">{org.name}</div>
                         <div className="flex items-center gap-2 text-xs text-slate-500">
                             <span className="capitalize">{org.plan.tier}</span>
@@ -411,8 +425,8 @@ export default function EmployerDashboard() {
                     </div>
                 </div>
 
-                <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 rounded-lg">
+                <div className="flex items-center gap-2 lg:gap-3">
+                    <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-slate-50 rounded-lg">
                         <span className="text-xs text-slate-500">Location:</span>
                         <select
                             className="bg-transparent text-sm font-medium text-slate-700 border-0 focus:ring-0 cursor-pointer pr-6"
@@ -424,11 +438,22 @@ export default function EmployerDashboard() {
                         </select>
                     </div>
 
+                    {/* Mobile location selector */}
+                    <select
+                        className="md:hidden px-2 py-1.5 text-xs font-medium text-slate-700 bg-slate-50 rounded-lg border-0"
+                        value={currentLoc}
+                        onChange={(e) => setCurrentLoc(e.target.value)}
+                    >
+                        <option value="ALL">All</option>
+                        {locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                    </select>
+
                     <button
                         onClick={() => { localStorage.removeItem('hure_auth_token'); localStorage.removeItem('hure_clinic_id'); window.location.href = '/'; }}
-                        className="px-3 py-1.5 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-100 transition-colors"
+                        className="px-2 lg:px-3 py-1.5 rounded-lg text-xs lg:text-sm font-medium text-slate-600 hover:bg-slate-100 transition-colors"
                     >
-                        Logout
+                        <span className="hidden sm:inline">Logout</span>
+                        <span className="sm:hidden">Exit</span>
                     </button>
                 </div>
             </div>
@@ -439,44 +464,69 @@ export default function EmployerDashboard() {
     // SIDEBAR - Enhanced
     // ============================================
 
-    const Sidebar = () => (
-        <div className="bg-slate-900 px-3 pt-6 pb-4 w-56 min-h-[calc(100vh-53px)] sticky top-0 flex flex-col shrink-0">
-            {/* User Info */}
-            <div className="mb-5 pb-4 border-b border-slate-700/50">
-                <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-white font-bold text-sm shadow-lg shadow-emerald-500/20">
-                        {currentUserRole.charAt(0).toUpperCase()}
+    const Sidebar = () => {
+        const handleNavClick = (newView) => {
+            setView(newView);
+            setSidebarOpen(false); // Close sidebar on mobile after navigation
+        };
+
+        return (
+            <>
+                {/* Mobile Overlay */}
+                {sidebarOpen && (
+                    <div
+                        className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+                        onClick={() => setSidebarOpen(false)}
+                    />
+                )}
+
+                {/* Sidebar */}
+                <aside className={`
+                    fixed lg:sticky top-[53px] left-0 z-40 h-[calc(100vh-53px)]
+                    w-64 lg:w-56 bg-slate-900 flex flex-col shrink-0
+                    transform transition-transform duration-300 ease-in-out
+                    ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+                `}>
+                    <div className="px-3 pt-6 pb-4 flex flex-col flex-1">
+                        {/* User Info */}
+                        <div className="mb-5 pb-4 border-b border-slate-700/50">
+                            <div className="flex items-center gap-3">
+                                <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-white font-bold text-sm shadow-lg shadow-emerald-500/20">
+                                    {currentUserRole.charAt(0).toUpperCase()}
+                                </div>
+                                <div>
+                                    <div className="text-sm font-semibold text-white capitalize">{currentUserRole}</div>
+                                    <div className="text-xs text-slate-400">{currentLocName}</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Navigation */}
+                        <nav className="space-y-1 flex-1">
+                            <div className="text-[10px] uppercase tracking-wider text-slate-500 font-medium px-3 mb-2">Main</div>
+                            {has('view_dashboard') && <NavBtn icon="📊" label="Dashboard" active={view === 'dashboard'} onClick={() => handleNavClick('dashboard')} />}
+                            {has('view_staff') && <NavBtn icon="👥" label="Staff" active={view === 'staff'} onClick={() => handleNavClick('staff')} />}
+                            {has('view_schedule') && <NavBtn icon="📅" label="Schedule" active={view === 'schedule'} onClick={() => handleNavClick('schedule')} />}
+                            {has('view_attendance') && <NavBtn icon="⏰" label="Attendance" active={view === 'attendance'} onClick={() => handleNavClick('attendance')} />}
+
+                            <div className="text-[10px] uppercase tracking-wider text-slate-500 font-medium px-3 mt-4 mb-2">Finance</div>
+                            {has('export_payroll') && <NavBtn icon="💰" label="Payroll" active={view === 'payroll'} onClick={() => handleNavClick('payroll')} />}
+                            {has('view_leave') && <NavBtn icon="🏖️" label="Leave" active={view === 'leave'} onClick={() => handleNavClick('leave')} />}
+                            {has('view_billing') && <NavBtn icon="💳" label="Billing" active={view === 'billing'} onClick={() => handleNavClick('billing')} />}
+
+                            <div className="text-[10px] uppercase tracking-wider text-slate-500 font-medium px-3 mt-4 mb-2">Admin</div>
+                            {(has('manage_org_verification') || has('manage_facility_verification')) &&
+                                <NavBtn icon="✅" label="Verification" active={view === 'verification'} onClick={() => handleNavClick('verification')} />}
+                            {(has('manage_org_settings') || has('manage_location_settings')) &&
+                                <NavBtn icon="⚙️" label="Settings" active={view === 'settings'} onClick={() => handleNavClick('settings')} />}
+                            {has('view_docs') && <NavBtn icon="📄" label="Documents" active={view === 'docs'} onClick={() => handleNavClick('docs')} />}
+                            {has('view_audit') && <NavBtn icon="📝" label="Audit Log" active={view === 'audit'} onClick={() => handleNavClick('audit')} />}
+                        </nav>
                     </div>
-                    <div>
-                        <div className="text-sm font-semibold text-white capitalize">{currentUserRole}</div>
-                        <div className="text-xs text-slate-400">{currentLocName}</div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Navigation */}
-            <nav className="space-y-1 flex-1">
-                <div className="text-[10px] uppercase tracking-wider text-slate-500 font-medium px-3 mb-2">Main</div>
-                {has('view_dashboard') && <NavBtn icon="📊" label="Dashboard" active={view === 'dashboard'} onClick={() => setView('dashboard')} />}
-                {has('view_staff') && <NavBtn icon="👥" label="Staff" active={view === 'staff'} onClick={() => setView('staff')} />}
-                {has('view_schedule') && <NavBtn icon="📅" label="Schedule" active={view === 'schedule'} onClick={() => setView('schedule')} />}
-                {has('view_attendance') && <NavBtn icon="⏰" label="Attendance" active={view === 'attendance'} onClick={() => setView('attendance')} />}
-
-                <div className="text-[10px] uppercase tracking-wider text-slate-500 font-medium px-3 mt-4 mb-2">Finance</div>
-                {has('export_payroll') && <NavBtn icon="💰" label="Payroll" active={view === 'payroll'} onClick={() => setView('payroll')} />}
-                {has('view_leave') && <NavBtn icon="🏖️" label="Leave" active={view === 'leave'} onClick={() => setView('leave')} />}
-                {has('view_billing') && <NavBtn icon="💳" label="Billing" active={view === 'billing'} onClick={() => setView('billing')} />}
-
-                <div className="text-[10px] uppercase tracking-wider text-slate-500 font-medium px-3 mt-4 mb-2">Admin</div>
-                {(has('manage_org_verification') || has('manage_facility_verification')) &&
-                    <NavBtn icon="✅" label="Verification" active={view === 'verification'} onClick={() => setView('verification')} />}
-                {(has('manage_org_settings') || has('manage_location_settings')) &&
-                    <NavBtn icon="⚙️" label="Settings" active={view === 'settings'} onClick={() => setView('settings')} />}
-                {has('view_docs') && <NavBtn icon="📄" label="Documents" active={view === 'docs'} onClick={() => setView('docs')} />}
-                {has('view_audit') && <NavBtn icon="📝" label="Audit Log" active={view === 'audit'} onClick={() => setView('audit')} />}
-            </nav>
-        </div>
-    );
+                </aside>
+            </>
+        );
+    };
 
     // ============================================
     // DASHBOARD VIEW
@@ -673,14 +723,14 @@ export default function EmployerDashboard() {
         };
 
         return (
-            <div className="space-y-6">
-                <div className="flex items-center justify-between">
+            <div className="space-y-4 lg:space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div>
-                        <h1 className="text-xl font-semibold text-slate-900">Staff</h1>
-                        <p className="text-sm text-slate-500 mt-0.5">Manage your team at {currentLocName}</p>
+                        <h1 className="text-lg lg:text-xl font-semibold text-slate-900">Staff</h1>
+                        <p className="text-xs lg:text-sm text-slate-500 mt-0.5">Manage your team at {currentLocName}</p>
                     </div>
                     {canManage && (
-                        <button onClick={() => setShowStaffModal(true)} className="px-4 py-2 rounded-lg text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700 transition-colors shadow-sm">
+                        <button onClick={() => setShowStaffModal(true)} className="px-3 lg:px-4 py-2 rounded-lg text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700 transition-colors shadow-sm w-full sm:w-auto">
                             + Add Staff
                         </button>
                     )}
@@ -2022,11 +2072,11 @@ export default function EmployerDashboard() {
     return (
         <div className="min-h-screen bg-slate-50 text-slate-900">
             <TopBar />
-            <div className="flex pt-[53px] min-h-screen">
+            <div className="lg:flex pt-[53px] min-h-screen">
                 <Sidebar />
-                <div className="flex-1 p-6">
+                <main className="flex-1 p-4 lg:p-6">
                     {renderView()}
-                </div>
+                </main>
             </div>
         </div>
     );
