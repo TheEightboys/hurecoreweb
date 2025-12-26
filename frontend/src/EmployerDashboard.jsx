@@ -487,9 +487,9 @@ export default function EmployerDashboard() {
                     transform transition-transform duration-300 ease-in-out
                     ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
                 `}>
-                    <div className="px-3 pt-6 pb-4 flex flex-col flex-1">
+                    <div className="px-3 pt-6 pb-6 flex flex-col flex-1 overflow-y-auto">
                         {/* User Info */}
-                        <div className="mb-5 pb-4 border-b border-slate-700/50">
+                        <div className="mb-5 pb-4 border-b border-slate-700/50 shrink-0">
                             <div className="flex items-center gap-3">
                                 <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-white font-bold text-sm shadow-lg shadow-emerald-500/20">
                                     {currentUserRole.charAt(0).toUpperCase()}
@@ -502,7 +502,7 @@ export default function EmployerDashboard() {
                         </div>
 
                         {/* Navigation */}
-                        <nav className="space-y-1 flex-1">
+                        <nav className="space-y-1 flex-1 pb-4">
                             <div className="text-[10px] uppercase tracking-wider text-slate-500 font-medium px-3 mb-2">Main</div>
                             {has('view_dashboard') && <NavBtn icon="📊" label="Dashboard" active={view === 'dashboard'} onClick={() => handleNavClick('dashboard')} />}
                             {has('view_staff') && <NavBtn icon="👥" label="Staff" active={view === 'staff'} onClick={() => handleNavClick('staff')} />}
