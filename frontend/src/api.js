@@ -3,7 +3,8 @@
  * Handles all API calls to the backend
  */
 
-// Vite uses import.meta.env, not process.env
+// API_BASE should be empty for same-origin deployments (Vercel)
+// Only set VITE_API_URL when backend is on a different domain
 const API_BASE = import.meta.env.VITE_API_URL || '';
 
 // Get stored auth token
