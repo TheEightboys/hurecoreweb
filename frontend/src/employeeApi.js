@@ -142,6 +142,10 @@ export async function acknowledgeDocument(docId) {
     });
 }
 
+export async function downloadDocument(docId) {
+    return apiFetch(`/api/employee/documents/${docId}/download`);
+}
+
 // ===================
 // HELPERS
 // ===================

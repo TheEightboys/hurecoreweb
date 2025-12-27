@@ -901,40 +901,54 @@ export default function EmployeeDashboard() {
                             {documents.length > 0 ? (
                                 <ul className="space-y-3">
                                     {documents.map(d => (
-                                        <li key={d.id} className="p-3 border rounded-lg flex items-center justify-between bg-gray-50">
-                                            <div>
-                                                <div className="font-medium">{d.title}</div>
-                                                <div className="text-xs text-gray-500 mt-1">
-                                                    {d.document_type}
-                                                </div>
-                                                {d.acknowledged && d.acknowledged_at && (
-                                                    <div className="text-xs text-green-600 mt-1 flex items-center gap-1">
-                                                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                                                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                                        </svg>
-                                                        Acknowledged on {formatDate(d.acknowledged_at.slice(0, 10))}
+                                        <li key={d.id} className="p-4 border rounded-lg bg-gray-50">
+                                            <div className="flex items-start justify-between gap-4">
+                                                <div className="flex-1">
+                                                    <div className="font-medium text-gray-900">{d.name}</div>
+                                                    <div className="text-xs text-gray-500 mt-1 flex items-center gap-2">
+                                                        <span className={`px-2 py-0.5 rounded-full text-xs ${d.category === 'policy' ? 'bg-purple-100 text-purple-700' :
+                                                                d.category === 'license' ? 'bg-blue-100 text-blue-700' :
+                                                                    d.category === 'contract' ? 'bg-amber-100 text-amber-700' :
+                                                                        'bg-gray-100 text-gray-700'
+                                                            }`}>
+                                                            {d.category || 'Document'}
+                                                        </span>
+                                                        {d.file_name && <span className="text-gray-400">• {d.file_name}</span>}
                                                     </div>
-                                                )}
-                                            </div>
-                                            <div className="flex items-center gap-2 text-sm">
-                                                {d.document_url && (
-                                                    <a
-                                                        href={d.document_url}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="text-blue-600 hover:underline"
-                                                    >
-                                                        View
-                                                    </a>
-                                                )}
-                                                {!d.acknowledged && (
+                                                    {d.acknowledged && d.acknowledged_at && (
+                                                        <div className="text-xs text-green-600 mt-2 flex items-center gap-1">
+                                                            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                                            </svg>
+                                                            Acknowledged on {formatDate(d.acknowledged_at.slice(0, 10))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <div className="flex items-center gap-2 text-sm flex-shrink-0">
                                                     <button
-                                                        onClick={() => acknowledgeDocument(d.id)}
-                                                        className="px-3 py-1.5 border rounded text-xs hover:bg-gray-100"
+                                                        onClick={async () => {
+                                                            try {
+                                                                const result = await employeeApi.downloadDocument(d.id);
+                                                                if (result.downloadUrl) {
+                                                                    window.open(result.downloadUrl, '_blank');
+                                                                }
+                                                            } catch (err) {
+                                                                alert('Failed to download: ' + err.message);
+                                                            }
+                                                        }}
+                                                        className="px-3 py-1.5 text-blue-600 hover:bg-blue-50 border border-blue-200 rounded text-xs"
                                                     >
-                                                        Acknowledge
+                                                        Download
                                                     </button>
-                                                )}
+                                                    {!d.acknowledged && (
+                                                        <button
+                                                            onClick={() => acknowledgeDocument(d.id)}
+                                                            className="px-3 py-1.5 bg-emerald-600 text-white rounded text-xs hover:bg-emerald-700"
+                                                        >
+                                                            Acknowledge
+                                                        </button>
+                                                    )}
+                                                </div>
                                             </div>
                                         </li>
                                     ))}

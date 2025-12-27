@@ -514,36 +514,73 @@ router.post('/leave', requireStaff, async (req, res) => {
 
 /**
  * GET /api/employee/documents
- * Get documents assigned to staff
+ * Get documents/policies assigned to staff's clinic
  */
 router.get('/documents', requireStaff, async (req, res) => {
     try {
-        const { data, error } = await supabaseAdmin
-            .from('documents')
-            .select(`
-                *,
-                acknowledgment:document_acknowledgments!left(
-                    acknowledged_at
-                )
-            `)
-            .eq('clinic_id', req.user.clinicId)
+        // Get clinic_id from staff table if not in token
+        let clinicId = req.user.clinicId;
+        if (!clinicId) {
+            const { data: staffData, error: staffError } = await supabaseAdmin
+                .from('staff')
+                .select('clinic_id')
+                .eq('id', req.user.staffId)
+                .single();
+
+            if (staffError || !staffData) {
+                console.error('Failed to get staff clinic:', staffError);
+                return res.status(500).json({ error: 'Failed to get staff details' });
+            }
+            clinicId = staffData.clinic_id;
+        }
+
+        // Fetch documents from clinic_documents table (policies shared with employees)
+        const { data: docs, error: docsError } = await supabaseAdmin
+            .from('clinic_documents')
+            .select('*')
+            .eq('clinic_id', clinicId)
+            .in('category', ['policy', 'license', 'contract']) // Only show relevant document types
             .order('created_at', { ascending: false });
 
-        if (error) {
+        if (docsError) {
+            console.error('Documents query error:', docsError);
             return res.status(500).json({ error: 'Failed to fetch documents' });
         }
 
-        // Format with acknowledgment status
-        const docs = (data || []).map(doc => {
-            const ack = doc.acknowledgment?.find(a => a.staff_id === req.user.staffId);
-            return {
-                ...doc,
-                acknowledged: !!ack,
-                acknowledgedAt: ack?.acknowledged_at || null
-            };
+        // Check acknowledgments for this staff member
+        const docIds = (docs || []).map(d => d.id);
+        let acknowledgments = [];
+
+        if (docIds.length > 0) {
+            const { data: acks } = await supabaseAdmin
+                .from('document_acknowledgments')
+                .select('document_id, acknowledged_at')
+                .eq('staff_id', req.user.staffId)
+                .in('document_id', docIds);
+
+            acknowledgments = acks || [];
+        }
+
+        // Create a map for quick lookup
+        const ackMap = {};
+        acknowledgments.forEach(a => {
+            ackMap[a.document_id] = a.acknowledged_at;
         });
 
-        res.json({ documents: docs });
+        // Format documents with acknowledgment status
+        const documents = (docs || []).map(doc => ({
+            id: doc.id,
+            name: doc.name,
+            category: doc.category,
+            file_name: doc.file_name,
+            file_type: doc.file_type,
+            file_size: doc.file_size,
+            created_at: doc.created_at,
+            acknowledged: !!ackMap[doc.id],
+            acknowledged_at: ackMap[doc.id] || null
+        }));
+
+        res.json({ documents });
     } catch (err) {
         console.error('Get documents error:', err);
         res.status(500).json({ error: 'Server error' });
@@ -552,18 +589,29 @@ router.get('/documents', requireStaff, async (req, res) => {
 
 /**
  * POST /api/employee/documents/:docId/acknowledge
- * Acknowledge a document
+ * Acknowledge a document/policy
  */
 router.post('/documents/:docId/acknowledge', requireStaff, async (req, res) => {
     try {
         const { docId } = req.params;
 
-        // Check if document exists
+        // Get clinic_id from staff table if not in token
+        let clinicId = req.user.clinicId;
+        if (!clinicId) {
+            const { data: staffData } = await supabaseAdmin
+                .from('staff')
+                .select('clinic_id')
+                .eq('id', req.user.staffId)
+                .single();
+            clinicId = staffData?.clinic_id;
+        }
+
+        // Check if document exists in clinic_documents
         const { data: doc } = await supabaseAdmin
-            .from('documents')
+            .from('clinic_documents')
             .select('*')
             .eq('id', docId)
-            .eq('clinic_id', req.user.clinicId)
+            .eq('clinic_id', clinicId)
             .single();
 
         if (!doc) {
@@ -576,10 +624,10 @@ router.post('/documents/:docId/acknowledge', requireStaff, async (req, res) => {
             .select('*')
             .eq('document_id', docId)
             .eq('staff_id', req.user.staffId)
-            .single();
+            .maybeSingle();
 
         if (existing) {
-            return res.json(existing);
+            return res.json({ success: true, acknowledgment: existing });
         }
 
         // Create acknowledgment
@@ -594,14 +642,68 @@ router.post('/documents/:docId/acknowledge', requireStaff, async (req, res) => {
             .single();
 
         if (error) {
+            console.error('Acknowledge insert error:', error);
             return res.status(500).json({ error: 'Failed to acknowledge document' });
         }
 
-        res.json(data);
+        res.json({ success: true, acknowledgment: data });
     } catch (err) {
         console.error('Acknowledge document error:', err);
         res.status(500).json({ error: 'Server error' });
     }
 });
 
+/**
+ * GET /api/employee/documents/:docId/download
+ * Get signed download URL for a document
+ */
+router.get('/documents/:docId/download', requireStaff, async (req, res) => {
+    try {
+        const { docId } = req.params;
+
+        // Get clinic_id from staff table if not in token
+        let clinicId = req.user.clinicId;
+        if (!clinicId) {
+            const { data: staffData } = await supabaseAdmin
+                .from('staff')
+                .select('clinic_id')
+                .eq('id', req.user.staffId)
+                .single();
+            clinicId = staffData?.clinic_id;
+        }
+
+        // Get document
+        const { data: doc, error: docError } = await supabaseAdmin
+            .from('clinic_documents')
+            .select('*')
+            .eq('id', docId)
+            .eq('clinic_id', clinicId)
+            .single();
+
+        if (docError || !doc) {
+            return res.status(404).json({ error: 'Document not found' });
+        }
+
+        // Generate signed URL (valid for 1 hour)
+        const { data: signedUrl, error: urlError } = await supabaseAdmin.storage
+            .from('clinic-documents')
+            .createSignedUrl(doc.file_path, 3600);
+
+        if (urlError) {
+            console.error('Signed URL error:', urlError);
+            return res.status(500).json({ error: 'Failed to generate download URL' });
+        }
+
+        res.json({
+            success: true,
+            downloadUrl: signedUrl.signedUrl,
+            fileName: doc.file_name
+        });
+    } catch (err) {
+        console.error('Download document error:', err);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
 module.exports = router;
+
