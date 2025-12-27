@@ -121,22 +121,22 @@ export default function Homepage() {
                     <div className="absolute inset-0 overflow-hidden pointer-events-none">
                         <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-emerald-500/20 rounded-full blur-[120px]" />
                     </div>
-                    <div className="animate-hero hidden sm:inline-flex items-center gap-2 px-4 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-full text-emerald-400 text-sm mb-8">
+                    <div className="animate-hero hidden sm:inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-500/10 border border-emerald-500/20 rounded-full text-emerald-400 text-sm mb-10">
                         <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
                         Multi-Tenant Staff Management Platform
                     </div>
-                    <h1 className="animate-hero text-4xl sm:text-5xl md:text-7xl font-bold text-white mb-6 leading-tight">
+                    <h1 className="animate-hero text-4xl sm:text-5xl md:text-7xl font-bold text-white mb-8 leading-tight">
                         <span className="block bg-gradient-to-r from-emerald-400 to-teal-300 bg-clip-text text-transparent">Hure Core</span>
-                        <span className="block text-xl sm:text-3xl md:text-4xl mt-2 text-slate-300 font-medium">Multi-Tenant Staff Management</span>
+                        <span className="block text-xl sm:text-3xl md:text-4xl mt-4 text-slate-300 font-medium">Multi-Tenant Staff Management</span>
                     </h1>
-                    <p className="animate-hero text-base sm:text-xl text-slate-400 mb-12 max-w-2xl mx-auto">
+                    <p className="animate-hero text-base sm:text-xl text-slate-400 mb-10 max-w-2xl mx-auto leading-relaxed px-4">
                         HURE Core streamlines staff management, scheduling, attendance tracking, and compliance for organizations of all sizes.
                     </p>
-                    <div className="animate-hero flex flex-col sm:flex-row gap-4 justify-center">
-                        <button onClick={handleGetStarted} className="group px-8 py-4 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl font-semibold text-lg shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 hover:scale-105 transition-all">
+                    <div className="animate-hero flex flex-col sm:flex-row gap-5 justify-center items-center">
+                        <button onClick={handleGetStarted} className="group px-10 py-4 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl font-semibold text-lg shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 hover:scale-105 transition-all">
                             Get Started <span className="inline-block ml-2 group-hover:translate-x-1 transition-transform">→</span>
                         </button>
-                        <button onClick={handleEmployerLogin} className="px-8 py-4 bg-white/5 text-white rounded-xl font-semibold text-lg border border-white/10 hover:bg-white/10 transition-all">Sign In to Dashboard</button>
+                        <button onClick={handleEmployerLogin} className="px-10 py-4 bg-white/5 text-white rounded-xl font-semibold text-lg border border-white/10 hover:bg-white/10 transition-all">Sign In to Dashboard</button>
                     </div>
                 </div>
             </div>
