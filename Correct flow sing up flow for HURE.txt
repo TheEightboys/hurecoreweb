@@ -1,0 +1,96 @@
+Correct flow sing up flow for HURE Core
+This is the simplest case 
+Goes to website clicks on Hure core
+SINGLE-LOCATION CLINIC WORKFLOW
+Step 1: Account creation
+Clinic provides:
+•	Organization name
+•	Contact person name
+•	Phone number
+•	Email
+•	Password
+Account is created in PENDING_VERIFICATION
+Step 2: Organization verification
+User submits:
+•	Business registration / incorporation certificate
+•	(Optional but recommended) KRA PIN
+Status options:
+•	Pending
+•	Under review
+•	Approved
+•	Rejected (with rejection notes) 
+Notifications:
+•	Status updates sent to Notifications section 
+Allow plan purchase after organization verification
+Do NOT require facility approval to purchase plan (too much friction)
+Step 3: Facility verification (single location)
+Since there is only one location:
+•	Facility form should appear immediately (no dropdown)
+•	Required:
+o	Facility name
+o	License number
+o	Licensing body
+o	License expiry date
+o	Upload license document (PDF / image)
+o	Submit
+Status:
+•	Pending
+•	Approved
+•	Rejected (with notes + notification)
+What should be locked if facility is not verified:
+•	Scheduling
+•	Attendance
+•	Payroll export
+What should still work:
+•	Settings
+•	Profile
+•	Verification
+Step 5: Normal operations
+Once facility is approved:
+•	Everything unlocks
+•	No extra steps
+MULTI-LOCATION CLINIC WORKFLOW
+Step 1: Account creation
+Same as single clinic:
+•	Org name
+•	Contact person
+•	Phone number
+•	Email
+•	Password
+Step 2: Organization verification (ONCE)
+User submits:
+•	Business Registration Number
+•	KRA PIN (Optional but recommended)
+Status:
+•	Organization = Approved
+This unlocks ability to add locations
+Allow plan purchase after organization verification
+Step 3: Add locations 
+User adds:
+•	Nairobi
+•	Kisumu
+•	Mombasa
+•	etc.
+Each location starts as:
+•	Draft / Not verified
+Step 4: Facility verification (per location)
+For each location, user must submit:
+•	License number
+•	Licensing body
+•	Expiry date
+•	Upload license document
+Status per location:
+•	Approved / Pending / Rejected
+Step 5: Plan enforcement logic (VERY IMPORTANT)
+Your plan limits should control:
+•	How many locations can be ACTIVE
+•	Not how many can exist as drafts
+Example:
+•	Professional plan = 2 locations
+•	User can:
+o	Add 5 locations
+o	But only 2 can be active + operational
+o	Others remain locked until:
+	upgraded plan to Enterprise
+	or deactivated location
+

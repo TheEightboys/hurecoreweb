@@ -1,0 +1,344 @@
+Multi-Tenancy, Plan Limits, and Permissions (Employer Side)
+1) Tenancy boundaries (non-negotiable)
+Employer/Owner users must ONLY see data that belongs to their organization.
+SuperAdmin can see everything across orgs, but employer views must always be:
+•	org-scoped (only their organization)
+•	location-scoped (only the selected location, or “All Locations” when allowed)
+•	plan-scoped (respect subscription limits)
+If the employer UI shows cities/locations not owned by that org, that means you are accidentally reusing a SuperAdmin/global dataset.
+2) Plan limits to enforce (HURE Core)
+Use these plan limits:
+•	Essential: 1 location, 10 staff accounts, 2 admin seats
+•	Professional: 2 locations, 30 staff accounts, 5 admin seats
+•	Enterprise: 5 locations, 75 staff accounts, 10 admin seats
+Important: “Admin seats” means number of users with elevated access, not the number of role templates.
+3) Location scoping rules (Single vs Multi-location)
+A) Essential (1 location)
+UI expectations
+•	Do NOT show a location dropdown.
+•	Automatically scope all pages to the single locationId.
+•	No “All Locations” option.
+Data expectations
+•	All lists (Staff, Schedule, Attendance, Leave, Docs) must query with:
+o	organizationId = currentOrgId
+o	locationId = the only locationId
+B) Professional (2 locations)
+UI expectations
+•	Show location dropdown with:
+o	All Locations
+o	Location A
+o	Location B
+Data expectations
+•	When “All Locations” selected:
+o	show data for all org locations (but still within org)
+•	When a specific location selected:
+o	filter all module data by that locationId
+C) Enterprise (5 locations)
+Same behavior as Professional, but up to 5 locations in the dropdown.
+4) Where location lists must come from (fixing your current issue)
+On the Employer side, the location dropdown must be populated only from:
+locations WHERE organization_id = current_org_id
+Then enforce plan limit:
+if count(locations) > plan.locationLimit
+  show warning + block creation of new locations until upgrade
+Do not pull from global master cities / SuperAdmin location tables.
+5) Staff limit enforcement (per plan)
+Enforce staff capacity at two levels:
+UI level
+•	Disable “Add Staff” when at limit
+•	Show message:
+“You’ve reached your plan limit (10/30/75). Upgrade to add more staff.”
+Backend level (hard enforcement)
+•	Reject add/create requests if staff count >= limit
+Staff count should be computed as:
+•	all active staff accounts under org (or per location if you choose)
+•	recommended: org-wide staff cap (simpler + consistent with billing)
+The Staff module already follows the intended employer workflow patterns in the demo 
+HURE_Core_Employer-staff module
+6) Permissions and why Employer must have it in navigation
+I noticed Permissions was removed from the left navigation. Please restore it.
+Why Employer needs Permissions access
+Because in our model:
+•	Employer defines roles and permissions (HR, Payroll, Shift Manager, etc.)
+•	Employer assigns staff to those roles
+•	SuperAdmin does not manage internal clinic permissions
+If the employer cannot access Permissions, then:
+•	they can’t tailor roles to clinic reality
+•	you end up hardcoding roles (bad for different clinics)
+•	support load increases (“please change access for X”)
+•	it breaks our “employer autonomy” product promise
+The Full dashboard demo includes a Permissions tab in the sidebar for employer roles 
+7) The “Admin seats” rule (how permissions interact with plan limits)
+We are not limiting role names. Employers can create:
+•	HR
+•	Payroll
+•	Shift Manager
+•	Operations
+•	Compliance
+…any labels they want.
+But the system enforces capacity:
+An “admin seat” is any user assigned a role that includes elevated permissions.
+Elevated permissions (examples)
+•	manage_staff
+•	manage_schedule
+•	approve_leave
+•	edit_attendance
+•	export_payroll
+•	manage_docs_policies
+•	manage_verification
+•	manage_settings
+Enforcement behavior
+When assigning a role to a user:
+•	If the role includes any elevated permissions → it consumes 1 admin seat.
+•	If employer tries to assign a 6th elevated user on Professional:
+o	block the assignment
+o	show message:
+“You’ve reached your plan’s admin access limit (5 users). Upgrade or change an existing admin to Employee.”
+8) UI behavior summary (what the employer should experience)
+•	Single-location clinics: no location switcher, everything just works.
+•	Multi-location clinics: location switcher controls all modules.
+•	Employers always see only their own org’s locations and staff.
+•	Employers can manage Permissions because they are responsible for their internal operations.
+•	System enforces subscription limits quietly (disable + explain).
+Use a plan config like:
+const PLAN_LIMITS = {
+  ESSENTIAL: { locations: 1, staff: 10, adminSeats: 2 },
+  PROFESSIONAL: { locations: 2, staff: 30, adminSeats: 5 },
+  ENTERPRISE: { locations: 5, staff: 75, adminSeats: 10 },
+};
+Then enforce in:
+•	Location creation
+•	Staff creation
+•	Role assignment to elevated roles
+My additional request
+Rename the Card
+Pending Review (Verification) to Compliance Status
+Show breakdown, not a single number.
+Example:
+•	Organization Verification → Pending / Approved
+•	Facility Licenses → 1 Pending / 1 Approved
+•	Staff Licenses → 2 Expiring Soon
+Quick Actions 
+This is one of the strongest and perfect sections. Just a small change in the order
+Currently
+•	Manage Staff
+•	View Schedule
+•	Attendance
+•	Export Payroll
+Suggested order
+1.	View Schedule
+2.	Manage Staff
+3.	Attendance
+4.	Export Payroll
+This matches how clinics actually operate day-to-day.
+
+Schedule section
+I noticed the External coverage / External locum option was removed from the Schedule → Manage coverage flow.
+Please add it back, as it is an intentional and necessary part of the Schedule module, not Payroll.
+Reason:
+In real clinic operations, a shift manager may be unable to find in-house staff and will source coverage externally (agency, CareStint, or personal network).
+The system still needs to mark the shift as covered so coverage gaps are accurate.
+Why this is required (real clinic workflow)
+In real clinic operations, a shift manager may be unable to find in-house staff and will source coverage externally (agency, CareStint, or personal network).
+The system must still:
+•	Mark the shift as covered
+•	Remove coverage gaps
+•	Keep a record of who actually covered the shift
+Scope clarification (very important)
+External coverage is:
+•	Coverage-only at the schedule block level
+•	A non-employee record
+•	Manually entered by the shift manager
+External coverage is NOT:
+•	Employment
+•	An in-house staff member
+•	Subject to staff/admin limits
+•	Part of Attendance tracking
+External coverage MUST NOT:
+•	Create staff profiles
+•	Appear in Staff module
+•	Generate Attendance records
+•	Be treated as Monthly Salary payroll
+Expected Schedule behavior
+•	External professional is added manually inside Manage Coverage
+o	Name
+o	Optional phone
+o	Optional supervisor
+o	Optional notes (agency / agreed pay)
+•	Counts toward required headcount
+•	Coverage status updates correctly
+(e.g. “Short by 1” → “Covered”)
+This logic belongs under Schedule → Coverage, not Payroll.
+Payroll clarification (do NOT skip this)
+While external coverage is not employment, it must still create a payroll-ready record for reporting and export purposes.
+•	External coverage entries should appear in Payroll Export → Casual / Daily
+•	As a separate register, not mixed with employee payroll
+•	For audit, approval, and export only (as shown in the demo payroll)
+This preserves:
+•	Coverage accuracy
+•	Financial accountability
+•	Clean separation between employees and externals
+Date format + time formatting 
+In the table you have “25 Dec 2025” (good).
+In the modal the placeholder is mm/dd/yyyy (US format), this will confuse Kenyan/TZ/Uganda users.
+•	Use dd/mm/yyyy placeholder OR better: show date picker with label “Date (DD/MM/YYYY)”
+•	Keep display format consistent everywhere (like “25 Dec 2025”).
+Coverage summary card should “match” the table
+Right now it shows:
+•	“2 schedule blocks”
+•	“4 gaps”
+For clarity add:
+•	“Total required headcount”
+•	“Total assigned”
+Example:
+•	Blocks: 2
+•	Required: 7
+•	Assigned: 3
+•	Gaps: 4
+That makes the summary feel like it’s derived from the table.
+Add two tiny filters (huge usability win)
+Above the table, add:
+•	Date range (This week / Next 7 days / This month / Custom)
+•	Role filter (Nurse, CO, Lab Tech…)
+Attendance
+“Absent” logic is currently unreliable
+In your screenshot, someone clocked in 05:59 and clocked out 06:09 but status shows absent.
+I suggest
+•	Present (Full)
+Staff worked the full scheduled shift duration
+(or ≥ 8 hours if no schedule exists)
+•	Present (Partial)
+Staff worked at least 1 hour but less than the full scheduled shift
+•	Absent
+No clock-in recorded or total time worked was less than 1 hour
+•	Late
+Clock-in time is after the scheduled shift start
+(applies only when a schedule exists)
+•	No Clock-out
+Clock-in recorded but no clock-out recorded
+So “05:59–06:09” becomes Present (Partial) or Short shift — not absent.
+How it ties into Payroll
+Casual / Daily-paid staff
+•	Full shift → 1 unit
+•	Partial present → 0.5 unit (or pro-rated later)
+•	Absent → 0 units
+Salaried staff
+•	Attendance is informational:
+o	flags patterns (late, partial, absent)
+o	doesn’t auto-deduct unless HR decides
+Payroll
+Date format is wrong for your market
+The picker shows:
+•	12/02/2025 → 12/27/2025 (US format)
+
+•	change to East African format
+2 December 2025 → 27 December 2025
+Delete the note at the bottom that says:
+“Calculations based on KES 500/hour regular rate, 1.5x for overtime…”
+Clinics pay monthly salary, daily rate, or hourly
+Attendance → Payroll mapping is not visible
+Make payroll derived, not “magic”
+Add a small explanation panel above the table:
+Payroll is calculated from reviewed attendance records within the selected date range.
+Then list rules (short, human):
+•	Full Day = Full shift worked
+•	Half Day = Present (Partial)
+•	Absent = No pay (unless salaried)
+•	Overtime = Hours beyond scheduled shift
+Split logic by pay type (critical)
+You already support different pay types in Staff. Payroll must respect that.
+ (simple + realistic)
+For Salaried staff
+•	Gross = Monthly salary
+•	Attendance used for:
+o	reporting
+o	discipline
+o	exceptions (later)
+•	Do not auto-deduct yet
+For Daily / Casual staff
+•	Full day = 1 unit × daily rate
+•	Half day = 0.5 unit × daily rate
+•	Absent = 0
+For Hourly staff (optional now)
+•	Gross = hours × hourly rate
+•	OT = hours beyond shift × OT multiplier
+Do NOT apply one flat “KES 500/hour” logic to everyone.
+Lock attendance before payroll
+This is very important.
+Add a requirement:
+•	Payroll only includes attendance marked as “Reviewed / Locked”
+•	If not locked:
+o	Show warning:
+“Some attendance records are not yet reviewed and will be excluded.”
+See all the columns in the payroll section of the demo, they are very important to make the numbers instantly understandable, so I will appreciate if you can have them in the final product
+Under the Casual/Daily section, the  records should be created from Schedule → External cover entries, and stored as a payroll-ready register:
+•	date/period
+•	role
+•	location
+•	external name + optional phone
+•	optional supervisor + notes (agency / agreed pay)
+•	units (Full=1, Half=0.5, Absent=0)
+•	payroll status workflow: Draft → Submitted → Approved → Paid
+Important constraints:
+•	External cover records must NOT create staff profiles
+•	External cover must NOT appear in Staff or Attendance
+•	Payroll Export is for records/export, not full payroll processing.
+Billing 
+The section is perfect, please just add
+A) Make Plan Limits actionable (very important)
+Right now it says:
+•	Locations: 2
+•	Staff: 30
+Instead, it should say something like:
+Plan limits
+•	Locations: 2 / 2 used
+•	Staff: 27 / 30 used
+•	Admin roles: 3 / unlimited (or hidden, depending on your decision)
+And if exceeded:
+•	Soft warning (yellow)
+•	Not a hard block without messaging
+This ties Billing → Staff → Locations → Permissions together cleanly.
+Add “Upgrade / Manage plan” entry point
+Even if it’s not functional yet, the UI needs:
+“Manage subscription” or “Upgrade plan” button. You can gate it behind:
+“Contact HURE to upgrade”
+Expand Invoices (without making it complex)
+Invoices should show:
+•	Invoice number
+•	Date
+•	Amount
+•	Status (Paid / Due / Overdue)
+•	Download PDF
+Add a short explainer 
+•	Something like:
+•	“Billing covers your HURE Core subscription and usage limits. Payroll payments to staff or external cover are managed separately.”
+Verification
+Replace Verification with Organization Details
+Change the summary language
+•	“Verification Summary” → Compliance Summary
+•	“Facilities (6 locations)” should not hardcode 6.
+Make it dynamic based on plan + created locations:
+o	Facilities (X locations)
+Important plan enforcement (multi-tenancy)
+Facility Licensing list should only show locations the employer is allowed to have:
+•	Essential: 1 location
+•	Professional: 2 locations
+•	Enterprise: up to 5 locations
+If more exist in demo data, still display only allowed locations (or show locked ones with “Upgrade to add location”).
+Missing actions
+•	There is no Upload
+•	There is no Submit
+•	There is no Pending state behavior
+•	There is no guidance text
+Settings
+Settings should allow:
+•	Edit organization display name
+•	View locations
+•	Add new locations (if plan allows)
+•	Edit basic location metadata:
+o	Location name
+o	City / town
+o	Address
+o	Phone number 
+•	See location verification status (read-only)
+
