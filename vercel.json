@@ -1,0 +1,12 @@
+{
+    "buildCommand": "cd hure-core && npm install && npm run build",
+    "outputDirectory": "hure-core/dist",
+    "installCommand": "cd hure-core && npm install",
+    "framework": "vite",
+    "rewrites": [
+        {
+            "source": "/(.*)",
+            "destination": "/index.html"
+        }
+    ]
+}
